@@ -1,25 +1,21 @@
-import EMAN2
-import os
+# -*- coding: utf-8 -*-
+
 from EMAN2 import *
-from PyQt4 import QtCore, QtGui, QtOpenGL
-from emapplication import EMApp
-import IPython.lib.inputhook
-from emimage import image_update
 
-app = EMApp()
-EMAN2.GUIMode = True
-EMAN2.app = app
+object = EMData("/home/lqhuang/Git/orientation-python/particle/EMD-6044.map")
 
+# display(object)
 
-e = EMData()
+sym = Symmetries.get("c1")
+orients = sym.gen_orientations("eman", {"delta": 30})
 
-A = test_image(0)
+# euler_display(orients)
 
-B = test_image(1)
+proj = [object.project("standard", t) for t in orients]
 
-# display(A)
+i = enumerate(proj)
 
+print proj 
 
-a = test_image()
-
-display(a)
+# display(proj)
+# display(object)
