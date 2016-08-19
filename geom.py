@@ -5,7 +5,7 @@ Author: Marcus A. Brubaker; mbrubake@cs.toronto.edu
 import numpy as n
 from util import memoize
 
-def rotmat2D (theta):
+def rotmat2D(theta):
     return n.array([[n.cos(theta), -n.sin(theta)],
                    [n.sin(theta),  n.cos(theta)]])
 
