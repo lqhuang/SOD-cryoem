@@ -4,8 +4,9 @@
 #############
 ## Python
 #############
-
 *.py[cod]
+*.pyxbld[cod]
+*.py.*
 
 # Packages
 *.egg
