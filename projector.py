@@ -10,6 +10,9 @@ import numpy as n
 import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},reload_support=True)
 import sincint
 
+N_D = 40
+phantompath = 'particle/1AON.mrc'
+ctfparfile = 'particle/examplectfs.par' 
 
 mscope_params = {'akv':200,'wgh':0.07,'cs':2.0,'psize':2.8,'bfactor':500.0}
 N = 128
