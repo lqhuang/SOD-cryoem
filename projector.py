@@ -11,14 +11,14 @@ import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},
 import sincint
 
 N_D = 40
-phantompath = 'particle/1AON.mrc'
+phantompath = 'particle/EMD-2325.map'
 ctfparfile = 'particle/examplectfs.par' 
 
 mscope_params = {'akv':200,'wgh':0.07,'cs':2.0,'psize':2.8,'bfactor':500.0}
-N = 128
+N = 180
 rad = 0.95
 shift_sigma = 3.0
-sigma_noise = 25.0
+sigma_noise = 0
 M_totalmass = 80000
 kernel = 'lanczos'
 ksize = 6
@@ -37,7 +37,7 @@ M_totalmass = float(M_totalmass)
 srcctf_stack = CTFStack(ctfparfile,mscope_params)
 genctf_stack = GeneratedCTFStack(mscope_params,parfields=['PHI','THETA','PSI','SHX','SHY'])
 
-TtoF = sincint.gentrunctofull(rad=rad)
+TtoF = sincint.gentrunctofull(N=N, rad=rad)
 Cmap = n.sort(n.random.random_integers(0,srcctf_stack.get_num_ctfs()-1,N_D))
 
 M = mrc.readMRC(phantompath)
@@ -63,7 +63,8 @@ for i,srcctfI in enumerate(Cmap):
     
     # Randomly generate the viewing direction/shift
     pt = n.random.randn(3)
-    pt /= n.linalg.norm(pt)
+    pt = n.array([0,0,0])
+#    pt /= n.linalg.norm(pt)
     psi = 2*n.pi*n.random.rand()
     EA = geom.genEA(pt)[0]
     EA[2] = psi
