@@ -62,9 +62,8 @@ for i,srcctfI in enumerate(Cmap):
         prevctfI = srcctfI 
     
     # Randomly generate the viewing direction/shift
-    pt = n.random.randn(3)
-    pt = n.array([0,0,0])
-#    pt /= n.linalg.norm(pt)
+    pt = n.random.randn(3) # Euler angles
+    pt /= n.linalg.norm(pt)
     psi = 2*n.pi*n.random.rand()
     EA = geom.genEA(pt)[0]
     EA[2] = psi
