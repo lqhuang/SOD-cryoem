@@ -1,6 +1,11 @@
 import subprocess
+import sklearn.preprocessing as prep
 
-import numpy as np
+def standard_scale(X_train, X_test):
+    preprocessor = prep.StandardScaler().fit(X_train)
+    X_train = preprocessor.transform(X_train)
+    X_test = preprocessor.transform(X_test)
+    return X_train, X_test
 
 def run_system_command(command_string):
     """Function used to run the system command and return the log"""
