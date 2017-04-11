@@ -71,21 +71,21 @@ def rotmat3D_dir(projdir, psi=None):
         x,y,z = rotax[0],rotax[1],rotax[2]
         c, s = np.cos(rang), np.sin(rang)
         C = 1 - c
-        
-        R = np.array([[ x*x*C + c  , x*y*C - z*s, x*z*C + y*s ], \
-                      [ y*x*C + z*s, y*y*C + c  , y*z*C - x*s ], \
-                      [ z*x*C - y*s, z*y*C + x*s, z*z*C + c   ]], \
+
+        R = np.array([[x*x*C + c  , x*y*C - z*s, x*z*C + y*s], \
+                      [y*x*C + z*s, y*y*C + c  , y*z*C - x*s], \
+                      [z*x*C - y*s, z*y*C + x*s, z*z*C + c  ]], \
                      dtype=projdir.dtype)
     else:
         R = np.identity(3, dtype=projdir.dtype)
         if d[2] < 0:
-            R[1,1] = -1
-            R[2,2] = -1
+            R[1, 1] = -1
+            R[2, 2] = -1
 
     if psi is not None and psi != 0:
         R_in = np.array([[ np.cos(psi), -np.sin(psi),  0],
-                        [ np.sin(psi),  np.cos(psi),  0],
-                        [          0,           0,  1]])
+                         [ np.sin(psi),  np.cos(psi),  0],
+                         [           0,            0,  1]])
     
         R = np.dot(R, R_in)
 
@@ -99,7 +99,7 @@ def rotmat3D_expmap(e):
     K = np.array([[    0,-k[2], k[1]],\
                   [ k[2],    0,-k[0]],\
                   [-k[1], k[0],    0]],dtype=e.dtype)
-    return np.identity(3, dtype=e.dtype) + np.sin(theta)*K + (1-np.cos(theta))*np.dot(K,K)
+    return np.identity(3, dtype=e.dtype) + np.sin(theta)*K + (1-np.cos(theta))*np.dot(K, K)
 
 def genDir(EAs):
     """
@@ -107,7 +107,7 @@ def genDir(EAs):
     is in the x-y plane, the projection direction is given by R(EA)*z where 
     z = (0,0,1)
     """
-    dir_vec = np.array([rotmat3D_EA(*EA)[:,2] for EA in EAs])
+    dir_vec = np.array([rotmat3D_EA(*EA)[:, 2] for EA in EAs])
     return dir_vec
 
 def genEA(vec):
@@ -117,11 +117,11 @@ def genEA(vec):
     returns tuple (phi, theta, psi) with psi=0
     """
     assert vec.shape[-1] == 3
-    vec = np.asarray(vec).reshape((-1,3))
-    theta = np.arctan2(np.linalg.norm(vec[:,0:2], axis=1), vec[:,2]).reshape((-1,1))
-    phi = np.arctan2(vec[:,1], vec[:,0]).reshape((-1,1))
+    vec = np.asarray(vec).reshape((-1, 3))
+    theta = np.arctan2(np.linalg.norm(vec[:, 0:2], axis=1), vec[:, 2]).reshape((-1, 1))
+    phi = np.arctan2(vec[:, 1], vec[:, 0]).reshape((-1, 1))
     
-    return np.hstack([phi,theta,np.zeros_like(theta)])
+    return np.hstack([phi, theta,np. zeros_like(theta)])
 
 def gencoords_base(N, d):
     x = np.arange(-N/2,N/2,dtype=np.float32)
@@ -136,23 +136,23 @@ def gencoords(N,d,rad=None,truncmask=False,trunctype='circ'):
     coords in each dimension are [-N/2, N/2) 
     N should be even"""
     if not truncmask:
-        _, truncc, _ = gencoords(N,d,rad,True)
+        _, truncc, _ = gencoords(N, d, rad, True)
         return truncc
     
-    c = gencoords_base(N,d)
+    c = gencoords_base(N, d)
 
     if rad is not None:
         if trunctype == 'circ':
-            r2 = np.sum(c**2,axis=1)
+            r2 = np.sum(c**2, axis=1)
             trunkmask = r2 < (rad*N/2.0)**2
         elif trunctype == 'square':
-            r = np.max(np.abs(c),axis=1)
+            r = np.max(np.abs(c), axis=1)
             trunkmask = r < (rad*N/2.0)
             
         truncc = c[trunkmask,:]
     else:
-        trunkmask = np.ones((c.shape[0],),dtype=np.bool8)
+        trunkmask = np.ones((c.shape[0],), dtype=np.bool8)
         truncc = c
  
-    return c,truncc,trunkmask
+    return c, truncc, trunkmask
  

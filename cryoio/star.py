@@ -147,7 +147,10 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
                                             + '@' + str(imgs_path)
     with open(fname, 'w') as f:
         # write data name
-        f.write('data_' + str(block_name) + '\n' + '\n')
+        if block_name:
+            f.write('\n' + 'data_' + str(block_name) + '\n' + '\n')
+        else:
+            f.write('\n' + 'data_ \n' + '\n')
         # write label
         f.write('loop_' + '\n')
         for i, label in enumerate(label_names):
@@ -162,6 +165,32 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
                     data.append(value[idx])
             line = ' '.join(data)
             f.write(line + '\n')
+
+def easy_writeSTAR(fname, EAs=None, shifts=None, imgs_path=None, block_name=None):
+    """
+    keywords for Euler angles and shifts
+    AngleRot, AngleTilt, AnglePsi, OriginX, OriginY
+    """
+    import os
+    print(os.path.abspath('.'))
+    if not EAs and not shifts:
+        raise ValueError('please specify input data: Euler angles or shifts')
+    else:
+        metadata = dict()
+    if EAs:
+        if isinstance(EAs, list):
+            EAs = np.asarray(EAs)
+        assert EAs.shape[1] == 3
+        metadata['AngleRot'] = EAs[:, 0]
+        metadata['AngleTilt'] = EAs[:, 1]
+        metadata['AnglePsi'] = EAs[:, 2]
+    if shifts:
+        if isinstance(shifts, list):
+            shifts = np.asarray(shifts)
+        assert shifts.shape[1] == 2
+        metadata['OriginX'] = shifts[:, 0]
+        metadata['OriginY'] = shifts[:, 1]
+    writeSTAR(fname, imgs_path, block_name, **metadata)
 
 # ===== Utility Functions ===== #
 def get_indices_from_star(fname):
