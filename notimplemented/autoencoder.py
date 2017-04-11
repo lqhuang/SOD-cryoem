@@ -1,5 +1,6 @@
 import os
 import shutil
+import pickle
 import numpy as np
 import sklearn.preprocessing as prep
 import tensorflow as tf
@@ -85,10 +86,10 @@ class AdditiveGaussianNoiseAutoencoder(object):
         with tf.name_scope('Autoencoder'):
             with tf.name_scope('Input_Layer'):
                 self.x = tf.placeholder(tf.float32, [None, self.n_input])
-                image_original = tf.reshape(self.x, [-1, 28, 28, 1])
+                image_original = tf.reshape(self.x, [-1, 64, 64, 1])
                 tf.summary.image('original-input', image_original, 4)
                 self.input = self.x + scale * tf.random_normal((n_input,))
-                image_shaped_input = tf.reshape(self.input, [-1, 28, 28, 1])
+                image_shaped_input = tf.reshape(self.input, [-1, 64, 64, 1])
                 tf.summary.image('autoencoder-input', image_shaped_input, 4)
 
             with tf.name_scope('Layer_1'):
@@ -98,7 +99,10 @@ class AdditiveGaussianNoiseAutoencoder(object):
                     b1 = bias_variable([self.n_hidden])
                 with tf.name_scope('Wx_plus_b'):
                     layer1 = tf.add(tf.matmul(self.input, W1), b1)
-                    self.hidden_1 = self.transfer(layer1)
+                    if two_hidden_layers:
+                        self.hidden_1 = self.transfer(layer1)
+                    else:
+                        self.hidden_output = self.transfer(layer1)
 
             if two_hidden_layers:
                 with tf.name_scope('Layer_2'):
@@ -110,17 +114,23 @@ class AdditiveGaussianNoiseAutoencoder(object):
                         layer2 = tf.add(tf.matmul(self.hidden_1, W2), b2)
                         self.hidden_2 = self.transfer(layer2)
 
+                with tf.name_scope('Layer_3'):
+                    with tf.name_scope('Weights'):
+                        W = weight_variable([self.n_hidden, self.n_hidden])
+                    with tf.name_scope('Biases'):
+                        b = bias_variable([self.n_hidden])
+                    with tf.name_scope('Wx_plus_b'):
+                        layer3 = tf.add(tf.matmul(self.hidden_1, W2), b2)
+                        self.hidden_output = self.transfer(layer3)
+
             with tf.name_scope('reconstruction'):
                 with tf.name_scope('Weights'):
                     W_reco = weight_variable([self.n_hidden, self.n_input])
                 with tf.name_scope('Biases'):
                     b_reco = bias_variable([self.n_input])
                 with tf.name_scope('Wx_plus_b'):
-                    if two_hidden_layers:
-                        self.reconstruction = tf.add(tf.matmul(self.hidden_2, W_reco), b_reco)
-                    else:
-                        self.reconstruction = tf.add(tf.matmul(self.hidden_1, W_reco), b_reco)
-                image_shaped_output = tf.reshape(self.input, [-1, 28, 28, 1])
+                        self.reconstruction = tf.add(tf.matmul(self.hidden_output, W_reco), b_reco)
+                image_shaped_output = tf.reshape(self.input, [-1, 64, 64, 1])
                 tf.summary.image('autoencoder-output', image_shaped_input, 4)
 
         # loss function
@@ -170,18 +180,25 @@ class AdditiveGaussianNoiseAutoencoder(object):
         self.train_writer.close()
 
 # run
-log_dir = '/tmp/tensorflow/mnist/logs/autoencoder_noise_scale_0_1'
+log_dir = '/tmp/tensorflow/1AON'
 if os.path.exists(log_dir):
     shutil.rmtree(log_dir)
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-X_train, X_test = standard_scale(mnist.train.images, mnist.test.images)
+# mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+with open('./data/1AON_train.pkl', 'rb') as pkl_file:
+    # train_imgs = pickle.load(pkl_file)
+    X_train = pickle.load(pkl_file)
+with open('./data/1AON_test.pkl', 'rb') as pkl_file:
+    # test_imgs = pickle.load(pkl_file)
+    X_test = pickle.load(pkl_file)
+# image do not correct after standard_scale !!!!!!
+# X_train, X_test = standard_scale(train_imgs, test_imgs)
 
-n_samples = int(mnist.train.num_examples)
-training_epochs = 40
-batch_size = 256
+n_samples = X_train.shape[0]
+training_epochs = 100
+batch_size = 200
 display_step = 1
-autoencoder = AdditiveGaussianNoiseAutoencoder(n_input=784,
-                                               n_hidden=200,
+autoencoder = AdditiveGaussianNoiseAutoencoder(n_input=4096,
+                                               n_hidden=1000,
                                                transfer_function=tf.nn.softplus,
                                                optimizer=tf.train.AdamOptimizer(learning_rate=0.001),
                                                scale=0.1, two_hidden_layers=False)
@@ -189,7 +206,6 @@ autoencoder = AdditiveGaussianNoiseAutoencoder(n_input=784,
 total_batch = int(n_samples / batch_size)
 for epoch in range(training_epochs):
     avg_cost = 0
-    print("total_batch:"+str(total_batch))
     for i in range(total_batch):
         step = epoch * total_batch + i
         batch_xs = get_random_block_from_data(X_train, batch_size)
