@@ -1,6 +1,8 @@
 import numpy as np
 import healpy as hp
+from matplotlib import pyplot as plt
 
+from geom import geom
 
 # given nside | number of pixels | resolution (pixel size in degree) | Maximum angular distance (degree) | pixel area (in square degrees)
 #      1      |        12        |              58.6323              |              48.1897              |          3437.746771
@@ -27,4 +29,18 @@ def calculate_nside_resolution():
 
 
 if __name__ == '__main__':
+
     calculate_nside_resolution()
+
+    # generate random distribution of Euler angles
+    v = np.random.randn(100,3)
+    v = v  / np.linalg.norm(v, axis=1).repeat(3).reshape(-1,3)
+    EA = geom.genEA(v)
+    phi = EA[:, 0]
+    # phi += 2 * np.pi
+    theta = EA[:, 1]
+    # visulization
+    hp.mollview()
+    hp.visufunc.projscatter(theta, phi, 'r.')
+    hp.graticule()
+    plt.show()
