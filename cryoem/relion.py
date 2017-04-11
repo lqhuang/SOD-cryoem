@@ -3,7 +3,7 @@ import numpy as np
 from cryoio import mrc
 from util import run_system_command
 
-def project(map_file, proj, only_output_star=True, **kwargs):
+def project(map_file, proj, only_output_star=False, **kwargs):
     """
     project(map_file, proj, **kwargs)
     run relion_project with a system process
@@ -58,7 +58,6 @@ def project(map_file, proj, only_output_star=True, **kwargs):
         return star_file
     else:
         mrcs_file = str(proj) + '.mrcs'
-        raise NotImplementedError('Pro')
         return star_file, mrcs_file
 
 def reconstruct(star_file, output_mrc, threads=1, **kwargs):
