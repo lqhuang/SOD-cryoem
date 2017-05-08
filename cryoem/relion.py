@@ -3,6 +3,7 @@ import numpy as np
 from cryoio import mrc
 from util import run_system_command
 
+
 def project(map_file, proj, only_output_star=False, **kwargs):
     """
     project(map_file, proj, **kwargs)
@@ -49,7 +50,8 @@ def project(map_file, proj, only_output_star=False, **kwargs):
     if isinstance(map_file, str) is False:
         pass # Not implemented
     options = ['--{0} {1}'.format(str(key), str(value)) for (key, value) in kwargs.items()]
-    relion_project = 'relion_project --i {0} --o {1} {2} '.format(str(map_file), str(proj), ' '.join(options))
+    relion_project = 'relion_project --i {0} --o {1} {2}'.format(
+        str(map_file), str(proj), ' '.join(options))
     # try:
     output = run_system_command(relion_project)
 
@@ -106,6 +108,7 @@ def reconstruct(star_file, output_mrc, threads=1, **kwargs):
                  --reconstruct_ctf (-1) : Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels
     """
     options = ['--{0} {1}'.format(str(key), str(value)) for (key, value) in kwargs.items()]
-    relion_reconstruct = 'relion_reconstruct --i {0} --o {1} --j {2} {3}'.format(str(star_file), str(output_mrc), str(threads),' '.join(options))
+    relion_reconstruct = 'relion_reconstruct --i {0} --o {1} --j {2} {3}'.format(
+        str(star_file), str(output_mrc), str(threads), ' '.join(options))
     # try:
     output = run_system_command(relion_reconstruct)

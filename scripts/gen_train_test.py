@@ -12,7 +12,9 @@ from geom import geom
 from geom import healpix as hp
 
 
-phantompath = './particle/1AON.mrc'
+WD = '/Users/lqhuang/Git/SOD-cryoem'
+
+phantompath = os.path.join(WD, 'particle', '1AON.mrc')
 
 N = 128
 sigma_noise = 25.0
@@ -34,22 +36,22 @@ def gen_euler_angles(num_EAs):
         psi = 2 * np.pi * np.random.rand()
         EA = geom.genEA(pt)[0]
         EA[2] = psi
-        EAs.append(EA)
+        EAs.append(np.rad2deg(EA))
         # print(EA)
     return EAs
 
 # generate train dataset
-num_train = 1000
+num_train = 10000
 ori_train = gen_euler_angles(num_train)
-star.easy_writeSTAR('./data/train.star', EAs=ori_train)
-train_star, train_mrcs = relion.project(phantompath, './data/1AON_train',
-                                        ang='./data/train.star')
+star.easy_writeSTAR(os.path.join(WD, 'data', 'train.star'), EAs=ori_train)
+train_star, train_mrcs = relion.project(phantompath, os.path.join(WD, 'data', '1AON_train'),
+                                        ang=os.path.join(WD, 'data', 'train.star'))
 # generate test dataset
-num_test = 100
+num_test = 1000
 ori_test = gen_euler_angles(num_test)
-star.easy_writeSTAR('./data/test.star', EAs=ori_test)
-test_star, test_mrcs = relion.project(phantompath, './data/1AON_test',
-                                      ang='./data/1AON_test.star')
+star.easy_writeSTAR(os.path.join(WD, 'data', 'test.star'), EAs=ori_test)
+test_star, test_mrcs = relion.project(phantompath, os.path.join(WD, 'data', '1AON_test'),
+                                      ang=os.path.join(WD, 'data', 'test.star'))
 
 # train_star, train_mrcs = './data/1AON_train.star', './data/1AON_train.mrcs'
 # test_star, test_mrcs = './data/1AON_train.star', './data/1AON_train.mrcs'
