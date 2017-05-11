@@ -171,8 +171,6 @@ def easy_writeSTAR(fname, EAs=None, shifts=None, imgs_path=None, block_name=None
     keywords for Euler angles and shifts
     AngleRot, AngleTilt, AnglePsi, OriginX, OriginY
     """
-    import os
-    print(os.path.abspath('.'))
     if not EAs and not shifts:
         raise ValueError('please specify input data: Euler angles or shifts')
     else:
