@@ -14,7 +14,7 @@ from cryoio import mrc
 #     plt.imshow(test_data[i])
 # plt.show()
 
-test = mrc.readMRCimgs('./data/1AON_train.mrcs', 0)
+test = mrc.readMRCimgs('./data/EMD-6044/EMD6044_test.mrcs', 0)
 print(test.shape)
 plt.figure(1)
 for i in range(9):
