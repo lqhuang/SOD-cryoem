@@ -1,10 +1,10 @@
 import numpy as n
-from geom import gencoords
+from ..geom import gencoords
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
 
-import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},reload_support=True)
-import sparsemul
+# import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},reload_support=True)
+# import sparsemul
 
 def compute_density_moments(M,mu=None):
     N = M.shape[0]
