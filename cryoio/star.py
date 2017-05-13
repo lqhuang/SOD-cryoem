@@ -36,6 +36,7 @@ _rlnSphericalAberration
 from copy import deepcopy
 import numpy as np
 
+
 def return_scalar(string):
     """
     Return scalar if input string can transform to a scalar
@@ -47,6 +48,7 @@ def return_scalar(string):
     except ValueError:
         return string
 
+
 def isscalar(string):
     """
     Return True / False if input string can transform to a scalar
@@ -57,6 +59,7 @@ def isscalar(string):
         return True
     except ValueError:
         return False
+
 
 def readSTAR(fname):
     """
@@ -85,9 +88,9 @@ def readSTAR(fname):
             if line and not blank_line_break:
                 blank_line_break = True
             elif not line and blank_line_break:
-                break # break when meet blank line again
+                break  # break when meet blank line again
             elif not line:
-                continue # skip when meet blank line
+                continue  # skip when meet blank line
             if values_in_table is False:
                 # read values without table format
                 if table_marker in line[0]:
@@ -116,13 +119,14 @@ def readSTAR(fname):
                 if line and not blank_line_break:
                     blank_line_break = True
                 elif not line and blank_line_break:
-                    break # break when meet blank line again
+                    break  # break when meet blank line again
                 elif not line:
-                    continue # skip when meet blank line
+                    continue  # skip when meet blank line
                 for i, label in enumerate(label_names):
                     value = return_scalar(line[i])
                     metadata_dict[label].append(value)
     return metadata_dict
+
 
 def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
     """
@@ -140,11 +144,12 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
     assert var_length == 0.0
     length = np.mean(label_length, dtype=int)
     label_prefix = '_rln'
-    start_idx = 1 # image indice in star file start from 1 (not 0)
-    if 'ImageName' in label_names and imgs_path:
+    start_idx = 1  # image indice in star file start from 1 (not 0)
+    if imgs_path is not None:
+        metadata_copy['ImageName'] = list(range(length))
         for i, value in enumerate(metadata_copy['ImageName']):
             metadata_copy['ImageName'][i] = str(int(value + start_idx)).zfill(6) \
-                                            + '@' + str(imgs_path)
+                + '@' + str(imgs_path)
     with open(fname, 'w') as f:
         # write data name
         if block_name:
@@ -154,7 +159,7 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
         # write label
         f.write('loop_' + '\n')
         for i, label in enumerate(label_names):
-            f.write(label_prefix + label + ' #' + str(i+1) + '\n')
+            f.write(label_prefix + label + ' #' + str(i + 1) + '\n')
         # write values
         for idx in range(length):
             data = list()
@@ -166,29 +171,29 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
             line = ' '.join(data)
             f.write(line + '\n')
 
+
 def easy_writeSTAR(fname, EAs=None, shifts=None, imgs_path=None, block_name=None):
     """
     keywords for Euler angles and shifts
     AngleRot, AngleTilt, AnglePsi, OriginX, OriginY
     """
-    if not EAs and not shifts:
+    if EAs is None and shifts is None:
         raise ValueError('please specify input data: Euler angles or shifts')
     else:
         metadata = dict()
-    if EAs:
-        if isinstance(EAs, list):
-            EAs = np.asarray(EAs)
+    if EAs is not None:
+        EAs = np.asarray(EAs)
         assert EAs.shape[1] == 3
         metadata['AngleRot'] = EAs[:, 0]
         metadata['AngleTilt'] = EAs[:, 1]
         metadata['AnglePsi'] = EAs[:, 2]
-    if shifts:
-        if isinstance(shifts, list):
-            shifts = np.asarray(shifts)
+    if shifts is not None:
+        shifts = np.asarray(shifts)
         assert shifts.shape[1] == 2
         metadata['OriginX'] = shifts[:, 0]
         metadata['OriginY'] = shifts[:, 1]
     writeSTAR(fname, imgs_path, block_name, **metadata)
+
 
 # ===== Utility Functions ===== #
 def get_indices_from_star(fname):
@@ -202,7 +207,7 @@ def get_indices_from_star(fname):
         metadata_dict = readSTAR(fname)
     try:
         length = len(metadata_dict['ImageName'])
-        indices = [i+start_idx for i in range(length)]
+        indices = [i + start_idx for i in range(length)]
     except KeyError:
         raise KeyError("This star file does't exist ImageName label")
     # get_indices_from_star(fname, inc_imgs_path=False)
@@ -218,6 +223,7 @@ def get_indices_from_star(fname):
     # else:
     #     return indices
     return indices
+
 
 def get_imgs_path_from_star(fname):
     """
@@ -235,6 +241,7 @@ def get_imgs_path_from_star(fname):
             return None
     else:
         return None
+
 
 def get_EAs_from_star(fname):
     """
@@ -255,10 +262,12 @@ def get_EAs_from_star(fname):
     try:
         psi = metadata_dict['AnglePsi']
     except KeyError:
-        raise KeyError("This star file does't exist inplane-rotation(psi) angles.")
+        raise KeyError(
+            "This star file does't exist inplane-rotation(psi) angles.")
     return rot, tilt, psi
 
-def get_shift_from_star(fname):
+
+def get_shifts_from_star(fname):
     """
     Return Euler Angles (phi, theta, psi) from a STAR file or a Metadata dict
     """
