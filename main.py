@@ -98,7 +98,7 @@ def find_similar(exp_proj):
     return idx
 
 
-def projection_matching(input_model, projs, nside=8, dir_suffix=None):
+def projection_matching(input_model, projs, nside, dir_suffix=None):
     """
     Parameters:
     -------
@@ -130,7 +130,7 @@ def projection_matching(input_model, projs, nside=8, dir_suffix=None):
     return orientations
 
 
-def reconstruct(projs_path, nside=8):
+def reconstruct(projs_path, nside):
 
     exp_samples = mrc.readMRCimgs(projs_path, idx=0)
     input_shape = exp_samples.shape
