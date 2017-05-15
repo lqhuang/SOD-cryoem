@@ -21,11 +21,9 @@ undone:
 """
 
 WD = '/home/lqhuang/Git/SOD-cryoem/data/job2'
-if not os.path.exists(WD):
-    os.mkdir(WD)
+os.mkdir(WD, parents=True, exist_ok=True)
 temp_directory = os.path.join(WD, 'tmp')
-if not os.path.exists(temp_directory):
-    os.mkdir(temp_directory)
+os.mkdir(temp_directory, parents=True, exist_ok=True)
 
 arr_type = type(np.ctypeslib.as_ctypes(np.float32()))
 
@@ -41,13 +39,13 @@ def gen_exp_samples(num_EAs, phantompath, data_dst):
         EA[2] = psi
         EAs.append(np.rad2deg(EA))
 
-    EAs_grid = gen_ref_EAs_grid()
+    # EAs_grid = gen_ref_EAs_grid()
     # grid_size = EAs_grid.shape[0]
     # EAs = EAs_grid[np.random.randint(0, grid_size, size=num_EAs)]
-    exp_star = data_dst + '_gen.star'
+    ang_star = data_dst + '_gen.star'
     star.easy_writeSTAR_relion(exp_star, EAs=EAs)
     projs_star, projs_mrcs = relion.project(phantompath, data_dst,
-                                            ang=exp_star)
+                                            ang=ang_star)
     return projs_star, projs_mrcs
 
 
@@ -146,8 +144,7 @@ def reconstruct(projs_path, nside):
         print('Iteration {0}'.format(it))
         dir_suffix = 'it' + str(it).zfill(3)
         iter_dir = os.path.join(WD, dir_suffix)
-        if not os.path.exists(iter_dir):
-            os.mkdir(iter_dir)
+        os.mkdir(iter_dir, parents=True, exist_ok=True)
 
         tic = time.time()
 
