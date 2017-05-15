@@ -1,6 +1,3 @@
-import tempfile
-import numpy as np
-from cryoio import mrc
 from util import run_system_command
 
 

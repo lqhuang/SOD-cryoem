@@ -61,14 +61,17 @@ def isscalar(string):
         return False
 
 
-def readSTAR(fname):
+def readSTAR(fname, mode='xmipp'):
     """
     Read a STAR file. Still can not deal with muliple data blocks now
     Return data in dict
     """
     block_prefix = 'data_'
     table_marker = 'loop_'
-    label_prefix = '_rln'
+    if 'relion' in mode:
+        label_prefix = '_rln'
+    elif 'xmipp' in mode:
+        label_prefix = '_'
     with open(fname, 'r') as f:
         # read name of data block
         while True:
@@ -128,9 +131,16 @@ def readSTAR(fname):
     return metadata_dict
 
 
-def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
+def writeSTAR(fname, mode, imgs_path=None, block_name=None, **metadata_dict):
     """
-    Write a STAR file in relion recommended format. Only write one data block now
+    Write a STAR file in relion recommended format. Only write one data block now.
+
+    Parameters:
+    ----
+    fname: str
+        filename to write star file
+    mode: str
+        relion or xmipp
     """
     # Class Dict is a mutable object, this function contain codes will revise dict values.
     # Hence, a deep copy is necessary.
@@ -143,12 +153,17 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
     var_length = np.asarray(label_length).var()
     assert var_length == 0.0
     length = np.mean(label_length, dtype=int)
-    label_prefix = '_rln'
+    if 'relion' in mode:
+        label_prefix = '_rln'
+        image_label = 'ImageName'
+    elif 'xmipp' in mode:
+        label_prefix = '_'
+        image_label = 'image'
     start_idx = 1  # image indice in star file start from 1 (not 0)
     if imgs_path is not None:
-        metadata_copy['ImageName'] = list(range(length))
-        for i, value in enumerate(metadata_copy['ImageName']):
-            metadata_copy['ImageName'][i] = str(int(value + start_idx)).zfill(6) \
+        metadata_copy[image_label] = list(range(length))  # ImageName / image
+        for i, value in enumerate(metadata_copy[image_label]):
+            metadata_copy[image_label][i] = str(int(value + start_idx)).zfill(6) \
                 + '@' + str(imgs_path)
     with open(fname, 'w') as f:
         # write data name
@@ -172,7 +187,7 @@ def writeSTAR(fname, imgs_path=None, block_name=None, **metadata_dict):
             f.write(line + '\n')
 
 
-def easy_writeSTAR(fname, EAs=None, shifts=None, imgs_path=None, block_name=None):
+def easy_writeSTAR_relion(fname, EAs=None, shifts=None, imgs_path=None, block_name=None):
     """
     keywords for Euler angles and shifts
     AngleRot, AngleTilt, AnglePsi, OriginX, OriginY
@@ -192,25 +207,55 @@ def easy_writeSTAR(fname, EAs=None, shifts=None, imgs_path=None, block_name=None
         assert shifts.shape[1] == 2
         metadata['OriginX'] = shifts[:, 0]
         metadata['OriginY'] = shifts[:, 1]
-    writeSTAR(fname, imgs_path, block_name, **metadata)
+    writeSTAR(fname, 'relion', imgs_path, block_name, **metadata)
+
+
+def easy_writeSTAR_xmipp(fname, EAs=None, shifts=None, imgs_path=None, block_name=None):
+    """
+    keywords for Euler angles and shifts
+    angleRot, angleTilt, anglePsi, shiftX, shiftY
+    """
+    if EAs is None and shifts is None:
+        raise ValueError('please specify input data: Euler angles or shifts')
+    else:
+        metadata = dict()
+    if EAs is not None:
+        EAs = np.asarray(EAs)
+        assert EAs.shape[1] == 3
+        metadata['angleRot'] = EAs[:, 0]
+        metadata['angleTilt'] = EAs[:, 1]
+        metadata['anglePsi'] = EAs[:, 2]
+    if shifts is not None:
+        shifts = np.asarray(shifts)
+        assert shifts.shape[1] == 2
+        metadata['shiftX'] = shifts[:, 0]
+        metadata['shiftY'] = shifts[:, 1]
+    writeSTAR(fname, 'xmipp', imgs_path, block_name, **metadata)
+
+
+def convert_relion_to_xmipp(relion_star, xmipp_star):
+    pass
+
+
+def convert_xmipp_to_relion(xmipp_star, relion_star):
+    pass
 
 
 # ===== Utility Functions ===== #
-def get_indices_from_star(fname):
+def get_label_name(label, dict_keys, lower=True):
     """
-    Return Euler Angles (phi, theta, psi) from a STAR file or a Metadata dict
+    Return label name from a dict keys.
+    Because label name is different in relion star file and xmipp star file.
     """
-    start_idx = 0
-    if isinstance(fname, dict):
-        metadata_dict = fname
+    if lower:
+        label_name = [key for key in dict_keys if label in key.lower()]
     else:
-        metadata_dict = readSTAR(fname)
-    try:
-        length = len(metadata_dict['ImageName'])
-        indices = [i + start_idx for i in range(length)]
-    except KeyError:
-        raise KeyError("This star file does't exist ImageName label")
-    # get_indices_from_star(fname, inc_imgs_path=False)
+        label_name = [key for key in dict_keys if label in key]
+    assert len(label_name) == 1
+    return label_name[0]
+
+
+def get_img_info_from_star(fname, inc_imgs_path=False):
     # if fname is dict like object, it conflict with 'inc_imgs_path=False'
     # if inc_imgs_path:
     #     line = metadata_dict['ImageName'][0].split('@')
@@ -222,6 +267,25 @@ def get_indices_from_star(fname):
     #     return indices, imgs_path
     # else:
     #     return indices
+    pass
+
+
+def get_indices_from_star(fname):
+    """
+    Return Euler Angles (phi, theta, psi) from a STAR file or a Metadata dict
+    """
+    start_idx = 0
+    if isinstance(fname, dict):
+        metadata_dict = fname
+    else:
+        metadata_dict = readSTAR(fname)
+    keys = metadata_dict.keys()
+    try:
+        img_label = get_label_name('image', keys)
+        length = len(metadata_dict[img_label])
+        indices = [i + start_idx for i in range(length)]
+    except IndexError:
+        raise IndexError("This star file does't exist ImageName label")
     return indices
 
 
@@ -233,13 +297,12 @@ def get_imgs_path_from_star(fname):
         metadata_dict = fname
     else:
         metadata_dict = readSTAR(fname)
-    if 'ImageName' in metadata_dict.keys():
-        try:
-            imgs_path = metadata_dict['ImageName'][0].split('@')[1]
-            return imgs_path
-        except IndexError:
-            return None
-    else:
+    keys = metadata_dict.keys()
+    try:
+        img_label = get_label_name('image', keys)
+        imgs_path = metadata_dict[img_label][0].split('@')[1]
+        return imgs_path
+    except IndexError:  # both two steps will raise IndexError
         return None
 
 
@@ -251,20 +314,25 @@ def get_EAs_from_star(fname):
         metadata_dict = fname
     else:
         metadata_dict = readSTAR(fname)
+    keys = metadata_dict.keys()
     try:
-        rot = metadata_dict['AngleRot']
+        rot_label = get_label_name('rot', keys)
+        rot = metadata_dict[rot_label]
     except KeyError:
         raise KeyError("This star file does't exist rotation(phi) angles.")
     try:
-        tilt = metadata_dict['AngleTilt']
+        tilt_label = get_label_name('tilt', keys)
+        tilt = metadata_dict[tilt_label]
     except KeyError:
         raise KeyError("This star file does't exist tilt(theta) angles.")
     try:
-        psi = metadata_dict['AnglePsi']
+        psi_label = get_label_name('psi', keys)
+        psi = metadata_dict[psi_label]
     except KeyError:
         raise KeyError(
             "This star file does't exist inplane-rotation(psi) angles.")
-    return rot, tilt, psi
+    EAs = np.asarray((rot, tilt, psi)).T
+    return EAs
 
 
 def get_shifts_from_star(fname):
@@ -275,12 +343,16 @@ def get_shifts_from_star(fname):
         metadata_dict = fname
     else:
         metadata_dict = readSTAR(fname)
+    keys = metadata_dict.keys()
     try:
-        xshift = metadata_dict['OriginX']
+        xshift_label = get_label_name('X', keys, lower=False)
+        xshift = metadata_dict[xshift_label]
     except KeyError:
         raise KeyError("This star file does't exist X shift.")
     try:
-        yshift = metadata_dict['OriginY']
+        yshift_label = get_label_name('Y', keys, lower=False)
+        yshift = metadata_dict[yshift_label]
     except KeyError:
         raise KeyError("This star file does't exist Y shift")
-    return xshift, yshift
+    shifts = np.asarray((xshift, yshift)).T
+    return shifts
