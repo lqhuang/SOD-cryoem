@@ -7,9 +7,8 @@ import numpy as np
 import healpy as hp
 
 from cryoio import star, mrc
-from cryoem import relion, xmipp
+from cryoem import relion, xmipp, cryoem
 from geom import geom
-import density
 
 
 """
@@ -20,13 +19,7 @@ undone:
 2. standard image preprocessing
 """
 
-WD = '/home/lqhuang/Git/SOD-cryoem/data/job2'
-os.mkdir(WD, parents=True, exist_ok=True)
-temp_directory = os.path.join(WD, 'tmp')
-os.mkdir(temp_directory, parents=True, exist_ok=True)
-
 arr_type = type(np.ctypeslib.as_ctypes(np.float32()))
-
 
 def gen_exp_samples(num_EAs, phantompath, data_dst):
     EAs = list()
@@ -43,7 +36,7 @@ def gen_exp_samples(num_EAs, phantompath, data_dst):
     # grid_size = EAs_grid.shape[0]
     # EAs = EAs_grid[np.random.randint(0, grid_size, size=num_EAs)]
     ang_star = data_dst + '_gen.star'
-    star.easy_writeSTAR_relion(exp_star, EAs=EAs)
+    star.easy_writeSTAR_relion(ang_star, EAs=EAs)
     projs_star, projs_mrcs = relion.project(phantompath, data_dst,
                                             ang=ang_star)
     return projs_star, projs_mrcs
@@ -69,7 +62,7 @@ def gen_ref_EAs_grid(nside=8, psi_step=10):
 
 def gen_mrcs_from_EAs(EAs, phantompath, dstpath):
 
-    ang_star = os.path.join(temp_directory, 'EAs.star')
+    ang_star = os.path.join(dstpath, 'EAs.star')
     star.easy_writeSTAR_relion(ang_star, EAs=EAs)
     projs_star, projs_mrcs = relion.project(phantompath, dstpath, ang=ang_star)
     model_projs = mrc.readMRCimgs(projs_mrcs, idx=0)
@@ -96,14 +89,18 @@ def find_similar(exp_proj):
     return idx
 
 
-def projection_matching(input_model, projs, nside, dir_suffix=None):
+def projection_matching(input_model, projs, nside, dir_suffix=None, **kwargs):
     """
     Parameters:
     -------
     input_model: path of input mrc file
     projections: numpy array
     """
-    EAs_grid = gen_ref_EAs_grid(nside=nside)
+    try:
+        WD = kwargs['WD']
+    except KeyError as error:
+        error.__doc__
+    EAs_grid = gen_ref_EAs_grid(nside=nside, psi_step=10)
     if dir_suffix:
         dstpath = os.path.join(WD, dir_suffix, 'model_projections')
     else:
@@ -128,14 +125,18 @@ def projection_matching(input_model, projs, nside, dir_suffix=None):
     return orientations
 
 
-def reconstruct(projs_path, nside):
+def reconstruct(projs_path, nside, psi_step, **kwargs):
 
+    try:
+        WD = kwargs['WD']
+    except KeyError as error:
+        error.__doc__
     exp_samples = mrc.readMRCimgs(projs_path, idx=0)
     input_shape = exp_samples.shape
     print('size of input images: {0}x{1}, number of input images: {2}'.format(*input_shape))
     print('generating random phantom density')
     N = input_shape[0]
-    M = density.generate_phantom_density(N, 0.95 * N / 2.0, 5 * N / 128.0, 30)
+    M = cryoem.generate_phantom_density(N, 0.95 * N / 2.0, 5 * N / 128.0, 30)
     output_mrc = os.path.join(WD, 'initial_random_model.mrc')
     mrc.writeMRC(output_mrc, M)
     print('Start projection matching')
@@ -144,7 +145,7 @@ def reconstruct(projs_path, nside):
         print('Iteration {0}'.format(it))
         dir_suffix = 'it' + str(it).zfill(3)
         iter_dir = os.path.join(WD, dir_suffix)
-        os.mkdir(iter_dir, parents=True, exist_ok=True)
+        os.makedirs(iter_dir, exist_ok=True)
 
         tic = time.time()
 
@@ -165,20 +166,35 @@ def reconstruct(projs_path, nside):
         print('---------------------------------------------------------------------------------')
 
 
-if __name__ == '__main__':
+def main():
     paser = argparse.ArgumentParser()
+    paser.add_argument('-j', '--job_id', help='ID for Job', type=int)
     paser.add_argument('-n', '--num_projs', help='generate N projections for simulation', type=int)
-    paser.add_argument('--nside', help='size number for healpix to generate reference grid.', type=int)
+    paser.add_argument('--nside', help='nside for healpix to generate reference grid.',
+                       type=float)
+    paser.add_argument('--psi_step', help='step for generating psi grids', type=int)
     paser.add_argument('--print_to_file', type=bool, default=False)
+
     args = paser.parse_args()
+    job_id = args.job_id
     num = args.num_projs
+    nside = args.nside
+    psi_step = args.psi_step
     print_to_file = args.print_to_file
+
+    WD = os.path.join(__file__, 'data', 'job'+str(job_id))
+    os.makedirs(WD, exist_ok=True)
+
     if print_to_file:
         import sys
         sys.stdout = open(os.path.join(WD, 'log.txt'), 'w')
     exp_star, exp_mrcs = gen_exp_samples(num,
-                                         'particle/EMD-6044.mrc',
+                                         os.path.join(__file__, 'particle/EMD-6044.mrc'),
                                          os.path.join(WD, 'exp_projections'))
-    reconstruct(exp_mrcs, nside=32)
+    reconstruct(exp_mrcs, nside=nside, psi_step=psi_step, **{'WD': WD})
     if print_to_file:
         sys.stdout.close()
+
+
+if __name__ == '__main__':
+    main()
