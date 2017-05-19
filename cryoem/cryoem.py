@@ -1,5 +1,5 @@
 import numpy as n
-from ..geom import gencoords
+from geom.geom import gencoords
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
 
