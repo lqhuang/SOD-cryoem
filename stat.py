@@ -1,4 +1,5 @@
 import os
+import glob
 import argparse
 
 import numpy as np
@@ -42,11 +43,13 @@ def plot_rmse(working_directory):
     plt.title('Compare with correct angle distribution')
     plt.savefig(os.path.join(figure_dir, 'it000'), dpi=150)
 
-    for i in range(1, 20):
+    exp_folder = glob.glob(os.path.join(working_directory, 'it*'))
+
+    for i, folder in enumerate(exp_folder):
         last = star.get_EAs_from_star(os.path.join(
-            working_directory, 'it' + str(i - 1).zfill(3), 'orientations.star'))
+            folder, 'orientations.star'))
         now = star.get_EAs_from_star(os.path.join(
-            working_directory, 'it' + str(i).zfill(3), 'orientations.star'))
+            folder, 'orientations.star'))
         correct_rmse = calc_rmse(correct, now)
         last_rmse = calc_rmse(last, now)
 
