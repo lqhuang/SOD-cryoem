@@ -44,14 +44,15 @@ def plot_rmse(working_directory):
     plt.savefig(os.path.join(figure_dir, 'it000'), dpi=150)
 
     exp_folder = glob.glob(os.path.join(working_directory, 'it*'))
+    last = star.get_EAs_from_star(os.path.join(exp_folder[0], 'orientations.star'))
+    exp_folder.pop(0)
 
-    for i, folder in enumerate(exp_folder):
-        last = star.get_EAs_from_star(os.path.join(
-            folder, 'orientations.star'))
+    for i, folder in enumerate(exp_folder, start=1):
         now = star.get_EAs_from_star(os.path.join(
             folder, 'orientations.star'))
         correct_rmse = calc_rmse(correct, now)
         last_rmse = calc_rmse(last, now)
+        last = now
 
         fig = plt.figure(num=i, figsize=(16, 6))
         gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1])
@@ -72,6 +73,7 @@ def plot_rmse(working_directory):
         plt.title('Compare with angle distribution of last iteration')
         plt.savefig(os.path.join(figure_dir, 'it' + str(i).zfill(3)),
                     dpi=150, bbox_inches='tight')
+        plt.close(fig)
 
 
 def main():
