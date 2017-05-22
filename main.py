@@ -182,7 +182,7 @@ def main():
     psi_step = args.psi_step
     print_to_file = args.print_to_file
 
-    WD = os.path.join(__file__, 'data', 'job'+str(job_id))
+    WD = os.path.join(os.path.dirname(__file__), 'data', 'job'+str(job_id))
     os.makedirs(WD, exist_ok=True)
 
     if print_to_file:
