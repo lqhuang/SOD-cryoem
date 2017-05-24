@@ -5,6 +5,7 @@ import multiprocessing as mp
 
 import numpy as np
 import healpy as hp
+from scipy.misc import imrotate
 
 from cryoio import star, mrc
 from cryoem import relion, xmipp, cryoem
@@ -43,7 +44,7 @@ def gen_exp_samples(num_EAs, phantompath, data_dst):
     return projs_star, projs_mrcs
 
 
-def gen_ref_EAs_grid(nside=8, psi_step=10):
+def gen_ref_EAs_grid(nside=8, psi_step=360):
 
     npix = hp.nside2npix(nside)
     resol = np.rad2deg(hp.nside2resol(nside))
@@ -78,17 +79,20 @@ def standard_processing(img_or_imgstack):
 def find_similar(exp_proj):
     tic = time.time()
     grid_size = model_proj_imgs.shape[2]
-    likelihood = np.zeros(grid_size)
+    likelihood = np.zeros((grid_size, 360))
     for i in range(grid_size):
         ref_proj = model_proj_imgs[:, :, i]
-        p = np.mean((exp_proj - ref_proj) ** 2 / (-2 * exp_proj ** 2))
-        likelihood[i] = p
+        for j in range(360):
+            rot_ref_proj = imrotate(ref_proj, j)
+            prob = np.mean((exp_proj - rot_ref_proj) ** 2 / (-2 * exp_proj ** 2))
+            likelihood[i, j] = prob
     idx = np.argmax(likelihood)
+    row_idx, col_idx = np.unravel_index(idx, (grid_size, 360))
     toc = time.time() - tic
     if toc > 3:
         print('\r{0} forloops cost {1:.4f} seconds.'.format(
             grid_size, toc), end='')
-    return idx
+    return row_idx, col_idx
 
 
 def projection_matching(input_model, projs, nside, dir_suffix=None, **kwargs):
@@ -102,7 +106,7 @@ def projection_matching(input_model, projs, nside, dir_suffix=None, **kwargs):
         WD = kwargs['WD']
     except KeyError as error:
         error.__doc__
-    EAs_grid = gen_ref_EAs_grid(nside=nside, psi_step=10)
+    EAs_grid = gen_ref_EAs_grid(nside=nside, psi_step=360)
     if dir_suffix:
         dstpath = os.path.join(WD, dir_suffix, 'model_projections')
     else:
@@ -117,17 +121,18 @@ def projection_matching(input_model, projs, nside, dir_suffix=None, **kwargs):
     model_proj_imgs = gen_mrcs_from_EAs(EAs_grid, input_model, dstpath)
     print('Time to recover projections from mrcs file: {0:.4f} s'.format(
         time.time() - tic))
-
     print('Projection matching: multiprocess start')
     with mp.Pool(processes=num_threads) as pool:
-        idx_orientations = pool.map(
+        idx = pool.map(
             find_similar, (projs[:, :, i] for i in range(num_projs)))
     print('\nFinish orientation!')
-    orientations = EAs_grid[idx_orientations]
+    idx_arr = np.asarray(idx)
+    orientations = EAs_grid[idx_arr[:, 0]]
+    orientations[:, 2] = idx_arr[:, 1]
     return orientations
 
 
-def reconstruct(projs_path, nside, psi_step, **kwargs):
+def reconstruct(projs_path, nside, **kwargs):
 
     try:
         WD = kwargs['WD']
@@ -177,26 +182,24 @@ def main():
                        help='generate N projections for simulation', type=int)
     paser.add_argument('--nside', help='nside for healpix to generate reference grid.',
                        type=float)
-    paser.add_argument('--psi_step', help='step for generating psi grids', type=int)
     paser.add_argument('--print_to_file', type=bool, default=False)
 
     args = paser.parse_args()
     job_id = args.job_id
     num = args.num_projs
     nside = args.nside
-    psi_step = args.psi_step
     print_to_file = args.print_to_file
 
-    WD = os.path.join(os.path.dirname(__file__), 'data', 'job'+str(job_id))
-    os.makedirs(WD, exist_ok=True)
+    working_dir = os.path.join(os.path.dirname(__file__), 'data', 'job'+str(job_id))
+    os.makedirs(working_dir, exist_ok=True)
 
     if print_to_file:
         import sys
-        sys.stdout = open(os.path.join(WD, 'log.txt'), 'w')
+        sys.stdout = open(os.path.join(working_dir, 'log.txt'), 'w')
     _, exp_mrcs = gen_exp_samples(num,
                                   os.path.join(os.path.dirname(__file__), 'particle', 'EMD-6044.mrc'),
-                                  os.path.join(WD, 'exp_projections'))
-    reconstruct(exp_mrcs, nside=nside, psi_step=psi_step, **{'WD': WD})
+                                  os.path.join(working_dir, 'exp_projections'))
+    reconstruct(exp_mrcs, nside=nside, **{'WD': working_dir})
     if print_to_file:
         sys.stdout.close()
 
