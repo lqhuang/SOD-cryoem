@@ -21,6 +21,7 @@ undone:
 
 arr_type = type(np.ctypeslib.as_ctypes(np.float32()))
 
+
 def gen_exp_samples(num_EAs, phantompath, data_dst):
     EAs = list()
     for i in range(num_EAs):
@@ -56,7 +57,7 @@ def gen_ref_EAs_grid(nside=8, psi_step=10):
     EAs_grid = np.vstack(EAs_tuple).T
     print('number of points on shpere: {0}. \n'
           'resolution: {1:.2f} degree, step of inplane-rotation: {2} degree\n'
-          'total grid size: {3}'.format(npix, resol, psi_step, npix*360/psi_step))
+          'total grid size: {3}'.format(npix, resol, psi_step, npix * 360 / psi_step))
     return EAs_grid
 
 
@@ -85,7 +86,8 @@ def find_similar(exp_proj):
     idx = np.argmax(likelihood)
     toc = time.time() - tic
     if toc > 3:
-        print('\r{0} forloops cost {1:.4f} seconds.'.format(grid_size, toc), end='')
+        print('\r{0} forloops cost {1:.4f} seconds.'.format(
+            grid_size, toc), end='')
     return idx
 
 
@@ -133,7 +135,8 @@ def reconstruct(projs_path, nside, psi_step, **kwargs):
         error.__doc__
     exp_samples = mrc.readMRCimgs(projs_path, idx=0)
     input_shape = exp_samples.shape
-    print('size of input images: {0}x{1}, number of input images: {2}'.format(*input_shape))
+    print('size of input images: {0}x{1}, number of input images: {2}'.format(
+        *input_shape))
     print('generating random phantom density')
     N = input_shape[0]
     M = cryoem.generate_phantom_density(N, 0.95 * N / 2.0, 5 * N / 128.0, 30)
@@ -150,7 +153,8 @@ def reconstruct(projs_path, nside, psi_step, **kwargs):
         tic = time.time()
 
         input_model = output_mrc
-        ori = projection_matching(input_model, exp_samples, nside=nside, dir_suffix=dir_suffix)
+        ori = projection_matching(
+            input_model, exp_samples, nside=nside, dir_suffix=dir_suffix)
 
         ori_star = os.path.join(WD, dir_suffix, 'orientations.star')
         star.easy_writeSTAR_xmipp(ori_star, EAs=ori, imgs_path=projs_path)
@@ -169,7 +173,8 @@ def reconstruct(projs_path, nside, psi_step, **kwargs):
 def main():
     paser = argparse.ArgumentParser()
     paser.add_argument('-j', '--job_id', help='ID for Job', type=int)
-    paser.add_argument('-n', '--num_projs', help='generate N projections for simulation', type=int)
+    paser.add_argument('-n', '--num_projs',
+                       help='generate N projections for simulation', type=int)
     paser.add_argument('--nside', help='nside for healpix to generate reference grid.',
                        type=float)
     paser.add_argument('--psi_step', help='step for generating psi grids', type=int)
