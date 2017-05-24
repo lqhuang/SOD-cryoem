@@ -193,9 +193,9 @@ def main():
     if print_to_file:
         import sys
         sys.stdout = open(os.path.join(WD, 'log.txt'), 'w')
-    exp_star, exp_mrcs = gen_exp_samples(num,
-                                         os.path.join(__file__, 'particle/EMD-6044.mrc'),
-                                         os.path.join(WD, 'exp_projections'))
+    _, exp_mrcs = gen_exp_samples(num,
+                                  os.path.join(os.path.dirname(__file__), 'particle', 'EMD-6044.mrc'),
+                                  os.path.join(WD, 'exp_projections'))
     reconstruct(exp_mrcs, nside=nside, psi_step=psi_step, **{'WD': WD})
     if print_to_file:
         sys.stdout.close()
