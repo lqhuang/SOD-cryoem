@@ -64,7 +64,7 @@ def gen_ref_EAs_grid(nside=8, psi_step=360):
 
 def gen_mrcs_from_EAs(EAs, phantompath, dstpath):
 
-    ang_star = os.path.join(dstpath, 'EAs.star')
+    ang_star = os.path.join(os.path.dirname(dstpath), 'EAs.star')
     star.easy_writeSTAR_relion(ang_star, EAs=EAs)
     projs_star, projs_mrcs = relion.project(phantompath, dstpath, ang=ang_star)
     model_projs = mrc.readMRCimgs(projs_mrcs, idx=0)
@@ -83,7 +83,7 @@ def find_similar(exp_proj):
     for i in range(grid_size):
         ref_proj = model_proj_imgs[:, :, i]
         for j in range(360):
-            rot_ref_proj = imrotate(ref_proj, j)
+            rot_ref_proj = imrotate(ref_proj, j, reshape=False, mode='nearest')
             prob = np.mean((exp_proj - rot_ref_proj) ** 2 / (-2 * exp_proj ** 2))
             likelihood[i, j] = prob
     idx = np.argmax(likelihood)
@@ -91,7 +91,7 @@ def find_similar(exp_proj):
     toc = time.time() - tic
     if toc > 3:
         print('\r{0} forloops cost {1:.4f} seconds.'.format(
-            grid_size, toc), end='')
+            grid_size * 360, toc), end='')
     return row_idx, col_idx
 
 
@@ -105,7 +105,8 @@ def projection_matching(input_model, projs, nside, dir_suffix=None, **kwargs):
     try:
         WD = kwargs['WD']
     except KeyError as error:
-        error.__doc__
+        raise KeyError('lack working directory')
+
     EAs_grid = gen_ref_EAs_grid(nside=nside, psi_step=360)
     if dir_suffix:
         dstpath = os.path.join(WD, dir_suffix, 'model_projections')
@@ -132,12 +133,13 @@ def projection_matching(input_model, projs, nside, dir_suffix=None, **kwargs):
     return orientations
 
 
-def reconstruct(projs_path, nside, **kwargs):
+def reconstruct(projs_path, nside, iteration_loops, **kwargs):
 
     try:
         WD = kwargs['WD']
     except KeyError as error:
-        error.__doc__
+        raise KeyError('lack working directory')
+
     exp_samples = mrc.readMRCimgs(projs_path, idx=0)
     input_shape = exp_samples.shape
     print('size of input images: {0}x{1}, number of input images: {2}'.format(
@@ -148,7 +150,7 @@ def reconstruct(projs_path, nside, **kwargs):
     output_mrc = os.path.join(WD, 'initial_random_model.mrc')
     mrc.writeMRC(output_mrc, M)
     print('Start projection matching')
-    total_iteration = 20
+    total_iteration = iteration_loops
     for it in range(total_iteration):
         print('Iteration {0}'.format(it))
         dir_suffix = 'it' + str(it).zfill(3)
@@ -159,7 +161,7 @@ def reconstruct(projs_path, nside, **kwargs):
 
         input_model = output_mrc
         ori = projection_matching(
-            input_model, exp_samples, nside=nside, dir_suffix=dir_suffix)
+            input_model, exp_samples, nside=nside, dir_suffix=dir_suffix, **kwargs)
 
         ori_star = os.path.join(WD, dir_suffix, 'orientations.star')
         star.easy_writeSTAR_xmipp(ori_star, EAs=ori, imgs_path=projs_path)
@@ -181,13 +183,16 @@ def main():
     paser.add_argument('-n', '--num_projs',
                        help='generate N projections for simulation', type=int)
     paser.add_argument('--nside', help='nside for healpix to generate reference grid.',
-                       type=float)
+                       type=int)
+    paser.add_argument('-i', '--iter', help='forloops to iterate',
+                       type=int, default=100)
     paser.add_argument('--print_to_file', type=bool, default=False)
 
     args = paser.parse_args()
     job_id = args.job_id
     num = args.num_projs
     nside = args.nside
+    iteration = args.iter
     print_to_file = args.print_to_file
 
     working_dir = os.path.join(os.path.dirname(__file__), 'data', 'job'+str(job_id))
@@ -199,7 +204,7 @@ def main():
     _, exp_mrcs = gen_exp_samples(num,
                                   os.path.join(os.path.dirname(__file__), 'particle', 'EMD-6044.mrc'),
                                   os.path.join(working_dir, 'exp_projections'))
-    reconstruct(exp_mrcs, nside=nside, **{'WD': working_dir})
+    reconstruct(exp_mrcs, nside, iteration, **{'WD': working_dir})
     if print_to_file:
         sys.stdout.close()
 
