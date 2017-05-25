@@ -5,7 +5,7 @@ import multiprocessing as mp
 
 import numpy as np
 import healpy as hp
-from scipy.misc import imrotate
+from scipy.ndimage.interpolation import rotate as imrotate
 
 from cryoio import star, mrc
 from cryoem import relion, xmipp, cryoem
