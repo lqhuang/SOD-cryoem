@@ -80,9 +80,11 @@ def find_similar(exp_proj):
     tic = time.time()
     grid_size = model_proj_imgs.shape[2]
     likelihood = np.zeros((grid_size, 360))
+    psi_step = 3
+    psi_angles = np.arange(0, 360, psi_step)
     for i in range(grid_size):
         ref_proj = model_proj_imgs[:, :, i]
-        for j in range(360):
+        for j in psi_angles:
             rot_ref_proj = imrotate(ref_proj, j, reshape=False, mode='nearest')
             prob = np.mean((exp_proj - rot_ref_proj) ** 2 / (-2 * exp_proj ** 2))
             likelihood[i, j] = prob
