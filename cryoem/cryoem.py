@@ -1,4 +1,4 @@
-import numpy as n
+import numpy as np
 from geom.geom import gencoords
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter

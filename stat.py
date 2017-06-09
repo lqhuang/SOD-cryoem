@@ -82,7 +82,7 @@ def main():
     parser.add_argument('-d', '--working_directory', type=str)
     args = parser.parse_args()
     working_directory = args.working_directory
-    WD = os.path.realpath(working_directory)
+    WD = os.path.abspath(working_directory)
     plot_rmse(WD)
 
 

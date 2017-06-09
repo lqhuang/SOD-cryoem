@@ -9,7 +9,7 @@ from cryoem import cryoem
 
 plt.rc('font', size=17)
 
-WD = 'data/job1'
+WD = 'data/job2'
 figure_dir = os.path.join(WD, 'Figures')
 if not os.path.exists(figure_dir):
     os.mkdir(figure_dir)
@@ -20,6 +20,8 @@ def calc_fsc(model_path1, model_path2):
     V2 = mrc.readMRC(model_path2)
     N = V1.shape[0]
 
+    V1, _ = cryoem.align_density(V1)
+    V2, _ = cryoem.align_density(V2)
 
     VF1 = np.fft.fftshift(np.fft.fftn(V1))
     VF2 = np.fft.fftshift(np.fft.fftn(V2))
