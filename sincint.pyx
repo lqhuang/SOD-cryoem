@@ -19,9 +19,11 @@
 # FOR MULTIPROCESSING TO GIVE A (LARGE) BENIFIT, export MKL_NUM_THREADS=1
 # BUT THIS SLOWS DOWN MAJOR NUMPY OPERATIONS
 
+from six.moves import xrange
+
 import numpy as n
 cimport numpy as n
-from geom import *
+from geom.geom import *
 import scipy.sparse as sp
 
 DTYPE = n.float32
@@ -33,7 +35,7 @@ ctypedef n.complex64_t CDTYPE_t
 ctypedef int ITYPE_t
 ctypedef unsigned int UITYPE_t
 
-from libc.math cimport round,floor,ceil,sqrt
+from libc.math cimport round, floor, ceil, sqrt
 
 #from cython.parallel import parallel, prange, threadid
 #cimport openmp
@@ -616,7 +618,7 @@ def symmetrize_volume_z(DTYPE_t[:,:,:] V,
 
     return out_ary
 
-def gentrunctofull (N=128, rad=0.3):
+def gentrunctofull(N=128, rad=0.3):
     """ Generates a sparse matrix operator that maps truncated image fourier coefficients (R) back to a full N**2 vector """
     xy = gencoords(N,2)
     r2 = n.sum(xy**2,axis=1)
@@ -634,7 +636,6 @@ def gentrunctofull (N=128, rad=0.3):
     spcsr.eliminate_zeros()
     return spcsr
     
-def genfulltotrunc (N=128, rad=0.3):
+def genfulltotrunc(N=128, rad=0.3):
     """ Generates a sparse matrix operator that maps full N**2 vector into truncated image fourier coefficients (R) """
     return gentrunctofull(N,rad).T
-

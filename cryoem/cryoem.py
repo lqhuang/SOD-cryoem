@@ -3,8 +3,8 @@ from geom.geom import gencoords
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
 
-# import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
-# import sparsemul
+import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
+import sparsemul
 
 
 def compute_density_moments(M, mu=None):
@@ -213,8 +213,6 @@ def getslices(V, SLOP, res=None):
 
 # 3D Densities
 # ===============================================================================================
-
-
 def window(v, func='hanning', params=None):
     """ applies a windowing function to the 3D volume v (inplace, as reference) """
 

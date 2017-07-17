@@ -3,6 +3,8 @@
 # Code ported from
 # https://github.com/scipy/scipy/blob/master/scipy/sparse/sparsetools/csr.h#L1010
 
+from six.moves import xrange
+
 import numpy as np
 cimport numpy as np
 from cython.parallel import *

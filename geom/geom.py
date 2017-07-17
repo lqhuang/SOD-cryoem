@@ -2,7 +2,7 @@
 # https://github.com/mbrubake/cryoem-cvpr2015
 # This code has been formated and modified
 import numpy as np
-
+from util import memoize
 
 def rotmat2D(theta):
     return np.array([[np.cos(theta), -np.sin(theta)], \
@@ -123,6 +123,7 @@ def genEA(vec):
     
     return np.hstack([phi, theta,np. zeros_like(theta)])
 
+@memoize
 def gencoords_base(N, d):
     x = np.arange(-N/2,N/2,dtype=np.float32)
     c = x.copy()
@@ -131,6 +132,7 @@ def gencoords_base(N, d):
 
     return c
 
+@memoize
 def gencoords(N,d,rad=None,truncmask=False,trunctype='circ'):
     """ generate coordinates of all points in an NxN..xN grid with d dimensions 
     coords in each dimension are [-N/2, N/2) 
