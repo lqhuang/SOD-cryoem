@@ -57,8 +57,7 @@ def align_density(M, upsamp=1.0):
         V[:, 0] *= -1
 
     out = rotate_density(M, V, mu, upsamp)
-
-#    (mu,covar) = compute_density_moments(out)
+    # (mu,covar) = compute_density_moments(out)
 
     return out, V
 
@@ -130,10 +129,10 @@ def resize_ndarray(D, nsz, axes):
                  for i in range(len(nsz))])
     sigmas = tuple([0.66 / zfs[i] if i in axes else 0
                     for i in range(len(nsz))])
-#    print zfs, sigmas, D.shape
-#     print "blurring...", ; sys.stdout.flush()
+    # print(zfs, sigmas, D.shape)
+    # print("blurring..."); sys.stdout.flush()
     blurD = spfilter.gaussian_filter(D, sigma=sigmas, order=0, mode='constant')
-#     print "zooming...", ; sys.stdout.flush()
+    # print("zooming..."); sys.stdout.flush()
     return spinterp.zoom(blurD, zfs, order=0)
 
 
@@ -265,9 +264,9 @@ def generate_phantom_density(N, window, sigma, num_blobs, seed=None):
     while curr_n < num_blobs:
         csigma = sigma * np.exp(0.25 * np.random.randn())
         radM = np.sum((coords - curr_c.reshape((1, 3)))
-                     ** 2, axis=1).reshape((N, N, N))
+                      ** 2, axis=1).reshape((N, N, N))
         inside = np.logical_and(radM < (3 * csigma)**2, inside_window)
-#        M[inside] = 1
+        # M[inside] = 1
         M[inside] += np.exp(-0.5 * (radM[inside] / csigma**2))
         curr_n += 1
 
