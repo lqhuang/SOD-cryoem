@@ -61,14 +61,14 @@ def rotmat3D_EA(phi, theta, psi=None):
     return rotation_matrix
 
 def rotmat3D_dir(projdir, psi=None):
-    d = projdir.reshape((3,))/np.linalg.norm(projdir)
-    vdir = np.array([0,0,1],dtype=projdir.dtype)
-    rotax = np.cross(vdir,d)
+    d = projdir.reshape((3,)) / np.linalg.norm(projdir)
+    vdir = np.array([0, 0, 1], dtype=projdir.dtype)
+    rotax = np.cross(vdir, d)
     rotaxnorm = np.linalg.norm(rotax)
     if rotaxnorm > 1e-16:
-        rang = np.arctan2(rotaxnorm,d[2])
+        rang = np.arctan2(rotaxnorm, d[2])
         rotax /= rotaxnorm
-        x,y,z = rotax[0],rotax[1],rotax[2]
+        x,y,z = rotax[0], rotax[1], rotax[2]
         c, s = np.cos(rang), np.sin(rang)
         C = 1 - c
 
@@ -96,9 +96,9 @@ def rotmat3D_expmap(e):
     if theta < 1e-16:
         return np.identity(3, dtype=e.dtype)
     k = e/theta
-    K = np.array([[    0,-k[2], k[1]],\
-                  [ k[2],    0,-k[0]],\
-                  [-k[1], k[0],    0]],dtype=e.dtype)
+    K = np.array([[    0,-k[2], k[1]], \
+                  [ k[2],    0,-k[0]], \
+                  [-k[1], k[0],    0]], dtype=e.dtype)
     return np.identity(3, dtype=e.dtype) + np.sin(theta)*K + (1-np.cos(theta))*np.dot(K, K)
 
 def genDir(EAs):
@@ -121,7 +121,7 @@ def genEA(vec):
     theta = np.arctan2(np.linalg.norm(vec[:, 0:2], axis=1), vec[:, 2]).reshape((-1, 1))
     phi = np.arctan2(vec[:, 1], vec[:, 0]).reshape((-1, 1))
     
-    return np.hstack([phi, theta,np. zeros_like(theta)])
+    return np.hstack([phi, theta, np.zeros_like(theta)])
 
 @memoize
 def gencoords_base(N, d):
@@ -133,7 +133,7 @@ def gencoords_base(N, d):
     return c
 
 @memoize
-def gencoords(N,d,rad=None,truncmask=False,trunctype='circ'):
+def gencoords(N, d, rad=None, truncmask=False, trunctype='circ'):
     """ generate coordinates of all points in an NxN..xN grid with d dimensions 
     coords in each dimension are [-N/2, N/2) 
     N should be even"""
