@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 from util import memoize
 import geom
 import numpy as np

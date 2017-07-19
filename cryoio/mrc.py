@@ -1,6 +1,8 @@
 # This code is copyright Marcus A. Brubaker and Ali Punjani, 2015.
 # https://github.com/mbrubake/cryoem-cvpr2015
 # formated and modified
+from __future__ import print_function, division
+
 import numpy as np
 import matplotlib.pyplot as plt
 

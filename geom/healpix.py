@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import numpy as np
 import healpy as hp
 
@@ -15,3 +17,24 @@ import healpy as hp
 #     512     |     3145728      |              0.1145               |              0.1196               |            0.013114
 #    1024     |     12582912     |              0.0573               |              0.0598               |            0.003278
 
+def gen_EAs_grid(nside=8, psi_step=360, unit='rad'):
+    """generate grid of Euler angles"""
+    npix = hp.nside2npix(nside)
+    resol = np.rad2deg(hp.nside2resol(nside))
+    theta, phi = hp.pix2ang(nside, range(npix))
+    psi = np.arange(0, 360, psi_step)
+    if unit == 'deg':
+        theta, phi = np.rad2deg(theta), np.rad2deg(phi)
+    elif unit == 'rad':
+        psi = np.deg2rad(psi)
+    else:
+        raise NotImplementedError('unsupport unit of angle')
+    # sequence of indexing is equal to 'xy'
+    grid_theta, grid_psi = np.meshgrid(theta, psi)
+    grid_phi, _ = np.meshgrid(phi, psi)
+    EAs_tuple = (grid_phi.flatten(), grid_theta.flatten(), grid_psi.flatten())
+    EAs_grid = np.vstack(EAs_tuple).T
+    print('number of points on shpere: {0}. \n'
+          'resolution: {1:.2f} degree, step of inplane-rotation: {2} degree\n'
+          'total grid size: {3}'.format(npix, resol, psi_step, npix * 360 / psi_step))
+    return EAs_grid

@@ -1,9 +1,11 @@
-from geom import geom
-import numpy as np
+from __future__ import print_function, print_function
 
+import numpy as np
 import pyximport; pyximport.install(
     setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
+from geom import geom
+
 
 precomputed_Rs = {}
 def compute_projection_matrix(projdirs, N, kern, kernsize, rad, projdirtype='dirs', sym=None, onlyRs=False, **kwargs):

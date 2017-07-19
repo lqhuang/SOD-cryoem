@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import numpy as np
 from geom.geom import gencoords
 import scipy.ndimage.interpolation as spinterp

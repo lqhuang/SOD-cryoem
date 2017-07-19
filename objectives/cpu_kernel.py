@@ -1,3 +1,5 @@
+from __future__ import print_function, division
+
 import numpy as np
 from threading import Thread, Lock
 from Queue import Queue

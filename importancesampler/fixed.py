@@ -1,7 +1,7 @@
 import numpy as n
 from util import logsumexp
 
-def multinomial_sample_residual(N,probs):
+def multinomial_sample_residual(N, probs):
     """
     This implements residual sampling from a multinomial distribution.
     The net result is a samplecount value with the same expected values but
@@ -95,7 +95,7 @@ class FixedImportanceSampler():
         if totalw == 0:
             return 1.0/len(self.domain)
 
-#        print >>sys.stderr, "{3}: {0} / {1} / {2}".format(self.num_dist - totalw, self.prev_globalw, self.globalw, self.suffix)
+        # print(>>sys.stderr, "{3}: {0} / {1} / {2}".format(self.num_dist - totalw, self.prev_globalw, self.globalw, self.suffix))
         globaldist = float(self.num_train_dist - totalw)/len(self.domain)
 
         for (w,vals) in zip(self.prev_globalw,self.prev_globalvals):
@@ -211,18 +211,18 @@ class FixedImportanceSampler():
             if n.isfinite(lse):
                 logprobs -= lse
             else:
-                print "WARNING: lse for {1} is not finite: {0}".format(lse,self.suffix)
-                print "logprobs = {0}".format(logprobs)
+                print("WARNING: lse for {1} is not finite: {0}".format(lse,self.suffix))
+                print("logprobs = {0}".format(logprobs))
                 logprobs[:] = -n.log(len(self.domain))
 
             # Compute effective sample size.
             # ess ~=~ the number of significant components in probs.
             # Note that large values of prior_prob will cause ess to be large.
-#            ess = 1.0/n.sum(probs**2)
-#            logess = -n.log(n.sum(n.exp(2*logprobs))
+            # ess = 1.0/n.sum(probs**2)
+            # logess = -n.log(n.sum(n.exp(2*logprobs))
             logess = -logsumexp(2*logprobs)
             if not (n.isfinite(logess) and logess > 0):
-                print "WARNING: logess is not finite and positive: {0}, {1}".format(logess,n.exp(logess))
+                print("WARNING: logess is not finite and positive: {0}, {1}".format(logess,n.exp(logess)))
                 ess = 1
             else:
                 ess = n.exp(logess)
@@ -235,7 +235,7 @@ class FixedImportanceSampler():
             if min(ess,num_samples)/len(self.domain) < (1 - 0.05):
                 probs = n.exp(logprobs)
                 samplecount = n.random.multinomial(num_samples,probs)
-#                samplecount = multinomial_sample_residual(num_samples,probs)
+                # samplecount = multinomial_sample_residual(num_samples,probs)
 
                 # only evaluate samples with nonzero counts
                 samples = n.where(samplecount)[0] 
@@ -343,4 +343,3 @@ class FixedImportanceSampler():
         else:
             avg_active = (self.sparsevals > 0).sum() / float(self.sparsevals.shape[0] * self.sparsevals.shape[1])
         return {'avg_active': avg_active}
-

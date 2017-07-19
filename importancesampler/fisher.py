@@ -71,7 +71,7 @@ precomputed_kernmats = {}
 def getkernmat(dirsout, dirsin, kappa, eps, chiral_flip):
     "Assume dirsout and dirsin and unit norm vectors"
 
-    arghash = hash ( (dirsout[::10].tostring(), dirsin[::10].tostring(), kappa, eps, chiral_flip) )
+    arghash = hash( (dirsout[::10].tostring(), dirsin[::10].tostring(), kappa, eps, chiral_flip) )
     if arghash in precomputed_kernmats:
         return precomputed_kernmats[arghash]
     else:
