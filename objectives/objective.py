@@ -30,5 +30,3 @@ class Objective():
 
     def learn_params(self, params, cparams, M=None, fM=None):
         pass
-            
-
