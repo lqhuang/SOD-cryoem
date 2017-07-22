@@ -1,8 +1,8 @@
 from fixed import FixedImportanceSampler
-import numpy as n
+import numpy as np
 import time
 
-import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},reload_support=True)
+import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
 import fisher_util
 
 import scipy.spatial as ss
@@ -16,7 +16,7 @@ class FixedFisherImportanceSampler(FixedImportanceSampler):
 
         # Compute symmetry operator
         if self.symmetry is not None:
-            self.symmetry_Rs = n.array(self.symmetry.get_rotations())
+            self.symmetry_Rs = np.array(self.symmetry.get_rotations())
         else:
             self.symmetry_Rs = None
 
@@ -30,7 +30,7 @@ class FixedFisherImportanceSampler(FixedImportanceSampler):
             tic = time.time();
         dirs1 = self.domain.get_dirs()
         pscale = params.get('is_fisher_pscale'+self.suffix,params.get('is_fisher_pscale',1.0))
-        kappa = n.log((2**odomain.dim)*pscale)/(1-n.cos(odomain.resolution))
+        kappa = np.log((2**odomain.dim)*pscale)/(1-np.cos(odomain.resolution))
         chiral_flip = params.get('is_fisher_chirality_flip'+self.suffix,params.get('is_fisher_chirality_flip',True))
         Rs = self.symmetry_Rs
         if timing: times += [time.time()-tic]
@@ -43,19 +43,19 @@ class FixedFisherImportanceSampler(FixedImportanceSampler):
             kernmat = getkernmat(dirs1, dirs2, kappa, eps, chiral_flip)
             if timing: times += [time.time()-tic]
             if logspace:
-                vals = n.exp(vals)
+                vals = np.exp(vals)
             if inds is None:
                 spvals = vals.ravel()
             else:
-                spvals = n.zeros(kernmat.shape[1])
+                spvals = np.zeros(kernmat.shape[1])
                 spvals[inds] = vals
             if timing: times += [time.time()-tic]
             ret = kernmat.dot(spvals).ravel()
             if timing: times += [time.time()-tic]
-            ret = n.maximum(ret, eps)
+            ret = np.maximum(ret, eps)
             ret /= ret.sum()
             if logspace:
-                ret = n.log(ret)
+                ret = np.log(ret)
             if timing: times += [time.time()-tic]
 
         else:
@@ -80,13 +80,13 @@ def getkernmat(dirsout, dirsin, kappa, eps, chiral_flip):
         if chiral_flip: 
             kdin2 = ss.cKDTree(-dirsin)
 
-        distthres = n.sqrt( -2.0/kappa * n.log(eps) )
+        distthres = np.sqrt( -2.0/kappa * np.log(eps) )
         distmat = kdout.sparse_distance_matrix(kdin, distthres).tocsr()
         if chiral_flip:
             distmat += kdout.sparse_distance_matrix(kdin2, distthres).tocsr()
         distmat = distmat.tocoo()
 
-        kerndata = n.exp(-kappa/2.0 * distmat.data**2)
+        kerndata = np.exp(-kappa/2.0 * distmat.data**2)
         kernmat = sp.coo_matrix((kerndata, (distmat.row, distmat.col)), distmat.shape)
 
         precomputed_kernmats[arghash] = kernmat

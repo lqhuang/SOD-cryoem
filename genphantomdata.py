@@ -22,9 +22,9 @@ try:
 except ModuleNotFoundError:
     import cPickle as pickle
 
-import numpy as n
+import numpy as np
 import pyximport; pyximport.install(
-    setup_args={"include_dirs": n.get_include()}, reload_support=True)
+    setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
 
 
@@ -57,7 +57,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
                                      'PHI', 'THETA', 'PSI', 'SHX', 'SHY'])
 
     TtoF = sincint.gentrunctofull(N=N, rad=rad)
-    Cmap = n.sort(n.random.random_integers(
+    Cmap = np.sort(np.random.random_integers(
         0, srcctf_stack.get_num_ctfs() - 1, N_D))
 
     M = mrc.readMRC(phantompath)
@@ -66,12 +66,12 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     if M_totalmass is not None:
         M *= M_totalmass / M.sum()
 
-    V = density.real_to_fspace(premult.reshape(
-        (1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * M)
+    V = density.real_to_fspace(
+        premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * M)
 
     print("Generating data...")
     sys.stdout.flush()
-    imgdata = n.empty((N_D, N, N), dtype=density.real_t)
+    imgdata = np.empty((N_D, N, N), dtype=density.real_t)
 
     pardata = {'R': [], 't': []}
 
@@ -91,12 +91,12 @@ def genphantomdata(N_D, phantompath, ctfparfile):
             prevctfI = srcctfI
 
         # Randomly generate the viewing direction/shift
-        pt = n.random.randn(3)
-        pt /= n.linalg.norm(pt)
-        psi = 2 * n.pi * n.random.rand()
+        pt = np.random.randn(3)
+        pt /= np.linalg.norm(pt)
+        psi = 2 * np.pi * np.random.rand()
         EA = geom.genEA(pt)[0]
         EA[2] = psi
-        shift = n.random.randn(2) * shift_sigma
+        shift = np.random.randn(2) * shift_sigma
 
         R = geom.rotmat3D_EA(*EA)[:, 0:2]
         slop = cryoops.compute_projection_matrix(
@@ -106,11 +106,11 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         D = slop.dot(V.reshape((-1,)))
         D *= S
 
-        imgdata[i] = density.fspace_to_real((C * TtoF.dot(D)).reshape((N, N))) + n.require(
-            n.random.randn(N, N) * sigma_noise, dtype=density.real_t)
+        imgdata[i] = density.fspace_to_real((C * TtoF.dot(D)).reshape((N, N))) + np.require(
+            np.random.randn(N, N) * sigma_noise, dtype=density.real_t)
 
         genctf_stack.add_img(genctfI,
-                             PHI=EA[0] * 180.0 / n.pi, THETA=EA[1] * 180.0 / n.pi, PSI=EA[2] * 180.0 / n.pi,
+                             PHI=EA[0] * 180.0 / np.pi, THETA=EA[1] * 180.0 / np.pi, PSI=EA[2] * 180.0 / np.pi,
                              SHX=shift[0], SHY=shift[1])
 
         pardata['R'].append(R)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     ctfstack.write_pardata(par_path)
 
     mrc_path = os.path.join(outpath, 'imgdata.mrc')
-    mrc.writeMRC(mrc_path, n.transpose(
+    mrc.writeMRC(mrc_path, np.transpose(
         imgdata, (1, 2, 0)), mscope_params['psize'])
 
     pard_path = os.path.join(outpath, 'pardata.pkl')

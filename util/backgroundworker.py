@@ -1,6 +1,7 @@
-from output import OutputStream
 from threading import Thread
 from time import sleep
+
+from .output import OutputStream
 
 class BackgroundWorker():
     """Background Worker class. Runs a thread that does work. Needs to be subclassed.

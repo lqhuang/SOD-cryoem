@@ -2,7 +2,7 @@ import os
 
 # These imports are here so that when we evaluate parameters we have access to the functions
 from math import *
-import numpy as n
+import numpy as np
 
 class EvaluatedParams(dict):
     """
@@ -69,7 +69,7 @@ class Params():
     def evaluate(self, skipfields = set(), **kwargs):
         locals().update(kwargs)
         cparams = EvaluatedParams(kwargs)
-        for k,v in self.globalparams.iteritems():
+        for k,v in self.globalparams.items():
             if isinstance(v, str) and k not in skipfields:
                 cparams[k] = eval(v)
             else:

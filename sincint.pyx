@@ -19,7 +19,7 @@
 # FOR MULTIPROCESSING TO GIVE A (LARGE) BENIFIT, export MKL_NUM_THREADS=1
 # BUT THIS SLOWS DOWN MAJOR NUMPY OPERATIONS
 
-from six.moves import xrange
+# from six.moves import xrange
 
 import numpy as n
 cimport numpy as n

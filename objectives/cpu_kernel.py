@@ -202,7 +202,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
         tic = time.time()
         self.q.join()
         outputs['like_timing']['join'] = time.time() - tic
-        outputs['kern_timing'] = dict([(k,np.sum(v)/self.numthreads) for k,v in outputs['kern_timing'].iteritems()])
+        outputs['kern_timing'] = dict([(k,np.sum(v)/self.numthreads) for k,v in outputs['kern_timing'].items()])
 
         # compute gradient of likelihood
         if compute_gradient:

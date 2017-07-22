@@ -1,4 +1,4 @@
-import numpy as n
+import numpy as np
 from util import logsumexp
 
 def multinomial_sample_residual(N, probs):
@@ -8,10 +8,10 @@ def multinomial_sample_residual(N, probs):
     with lower variance.
     """
     Nprobs = N*probs
-    samplecount = n.require(n.floor(Nprobs),dtype=n.int32)
+    samplecount = np.require(np.floor(Nprobs),dtype=np.int32)
     R = samplecount.sum()
     pbar = (Nprobs - samplecount) / (N - R)
-    samplecount += n.random.multinomial(N - R,pbar)
+    samplecount += np.random.multinomial(N - R,pbar)
     return samplecount
 
 class FixedImportanceSampler():
@@ -45,12 +45,12 @@ class FixedImportanceSampler():
                 self.prev_globalw = []
                 self.prev_globalcnts = []
 
-                self.globalvals = n.zeros(len(domain), dtype=n.float64)
+                self.globalvals = np.zeros(len(domain), dtype=np.float64)
                 self.globalw = 0
                 self.globalcnt = 0
-                self.global_contrib = n.empty(self.num_dist, dtype = n.int32)
+                self.global_contrib = np.empty(self.num_dist, dtype = np.int32)
                 self.global_contrib[:] = 0
-                self.global_upd = n.zeros(len(domain), dtype=n.float64)
+                self.global_upd = np.zeros(len(domain), dtype=np.float64)
             else:
                 self.prev_vals = None
                 self.globalvals = None
@@ -78,12 +78,12 @@ class FixedImportanceSampler():
                 self.prev_globalcnts.append(self.globalcnt)
 
                 # Allocate the new global distribution
-                self.globalvals = n.zeros(len(domain), dtype=n.float64)
+                self.globalvals = np.zeros(len(domain), dtype=np.float64)
                 self.globalw = 0
                 self.globalcnt = 0
                 self.global_contrib[self.global_contrib < 0] -= 1
                 self.global_contrib[self.global_contrib == 1] = -1
-                self.global_upd = n.zeros(len(domain), dtype=n.float64)
+                self.global_upd = np.zeros(len(domain), dtype=np.float64)
 
         self.global_cache = None
 
@@ -91,7 +91,7 @@ class FixedImportanceSampler():
         if self.global_cache is not None:
             return self.global_cache
 
-        totalw = n.sum(self.prev_globalw) + self.globalw
+        totalw = np.sum(self.prev_globalw) + self.globalw
         if totalw == 0:
             return 1.0/len(self.domain)
 
@@ -99,20 +99,20 @@ class FixedImportanceSampler():
         globaldist = float(self.num_train_dist - totalw)/len(self.domain)
 
         for (w,vals) in zip(self.prev_globalw,self.prev_globalvals):
-            if n.isfinite(w) and w > 0:
+            if np.isfinite(w) and w > 0:
                 globaldist = globaldist + w*vals
 
-        if n.isfinite(self.globalw) and self.globalw > 0:
+        if np.isfinite(self.globalw) and self.globalw > 0:
             globaldist = globaldist + self.globalvals
 
-        globaldist /= n.sum(globaldist)
+        globaldist /= np.sum(globaldist)
 
         self.global_cache = globaldist
 
         return globaldist
 
     def get_global_logdist(self):
-        return n.log(self.get_global_dist())
+        return np.log(self.get_global_dist())
 
     def get_image_dist(self,im,params = None):
         if params is None:
@@ -123,8 +123,8 @@ class FixedImportanceSampler():
 
             ret = self.evaluate_kernel(samples,expvals,pdom,params,logspace=False)
         else:
-            ret = n.empty(len(self.domain), 
-                          dtype=n.float64)                
+            ret = np.empty(len(self.domain), 
+                          dtype=np.float64)                
             ret[:] = 1.0/len(self.domain)
         return ret
 
@@ -137,9 +137,9 @@ class FixedImportanceSampler():
 
             ret = self.evaluate_kernel(samples,logvals,pdom,params,logspace=True)
         else:
-            ret = n.empty(len(self.domain), 
-                          dtype=n.float64)                
-            ret[:] = -n.log(len(self.domain))
+            ret = np.empty(len(self.domain), 
+                          dtype=np.float64)                
+            ret[:] = -np.log(len(self.domain))
         return ret
 
     def get_image_priorprob(self,im):
@@ -191,29 +191,29 @@ class FixedImportanceSampler():
 
                 # Mix the current estimate with a prior distribution
                 # probs *= (1.0 - prior_prob)
-                logprobs += n.log(1.0-prior_prob)
+                logprobs += np.log(1.0-prior_prob)
                 # probs += (1.0 - global_prob) * prior_prob / float(len(self.domain))
-                logprobs = n.logaddexp(logprobs,n.log((1.0 - global_prob) * prior_prob / float(len(self.domain))))
+                logprobs = np.logaddexp(logprobs,np.log((1.0 - global_prob) * prior_prob / float(len(self.domain))))
             else:
                 # Using only the prior distribution
-                logprobs = n.empty(len(self.domain))
-                logprobs[:] = n.log((1.0 - global_prob) / float(len(self.domain)))
+                logprobs = np.empty(len(self.domain))
+                logprobs[:] = np.log((1.0 - global_prob) / float(len(self.domain)))
 
             if global_prob > 0 and prior_prob > 0:
                 # Part of the prior prob is the global estimate of directions
                 # probs += (prior_prob * global_prob) * self.globalvals
-                logprobs = n.logaddexp(logprobs, n.log(prior_prob * global_prob) + self.get_global_logdist())
+                logprobs = np.logaddexp(logprobs, np.log(prior_prob * global_prob) + self.get_global_logdist())
 
             # Normalize the distribution
             # probs /= probs.sum()
-            logprobs[n.logical_not(n.isfinite(logprobs))] = -n.inf
+            logprobs[np.logical_not(np.isfinite(logprobs))] = -np.inf
             lse = logsumexp(logprobs)
-            if n.isfinite(lse):
+            if np.isfinite(lse):
                 logprobs -= lse
             else:
                 print("WARNING: lse for {1} is not finite: {0}".format(lse,self.suffix))
                 print("logprobs = {0}".format(logprobs))
-                logprobs[:] = -n.log(len(self.domain))
+                logprobs[:] = -np.log(len(self.domain))
 
             # Compute effective sample size.
             # ess ~=~ the number of significant components in probs.
@@ -221,24 +221,24 @@ class FixedImportanceSampler():
             # ess = 1.0/n.sum(probs**2)
             # logess = -n.log(n.sum(n.exp(2*logprobs))
             logess = -logsumexp(2*logprobs)
-            if not (n.isfinite(logess) and logess > 0):
-                print("WARNING: logess is not finite and positive: {0}, {1}".format(logess,n.exp(logess)))
+            if not (np.isfinite(logess) and logess > 0):
+                print("WARNING: logess is not finite and positive: {0}, {1}".format(logess,np.exp(logess)))
                 ess = 1
             else:
-                ess = n.exp(logess)
+                ess = np.exp(logess)
 
             # Tune the number of samples based on the effective sample size.
             if num_samples == 'auto':
-                num_samples = min(n.ceil(ess_scale*ess),len(self.domain))
+                num_samples = min(np.ceil(ess_scale*ess),len(self.domain))
 
             # Only do sampling if it's likely to save us at least 5%
             if min(ess,num_samples)/len(self.domain) < (1 - 0.05):
-                probs = n.exp(logprobs)
-                samplecount = n.random.multinomial(num_samples,probs)
+                probs = np.exp(logprobs)
+                samplecount = np.random.multinomial(num_samples,probs)
                 # samplecount = multinomial_sample_residual(num_samples,probs)
 
                 # only evaluate samples with nonzero counts
-                samples = n.where(samplecount)[0] 
+                samples = np.where(samplecount)[0] 
                 weights = samplecount[samples] / (probs[samples] * num_samples)
                 fullsampled = False
             else:
@@ -259,23 +259,23 @@ class FixedImportanceSampler():
 
         # IMPORTANT: Must make sure our stored memory here is distinct from the memory passed in with
         # samplevalues, otherwise it may get changed out from underneath us!!!
-        samplevalues = n.require(samplevalues,dtype=n.float64)
+        samplevalues = np.require(samplevalues,dtype=np.float64)
         if not logspace:
-            logsamplevalues = n.log(n.abs(samplevalues)/samplews)
+            logsamplevalues = np.log(np.abs(samplevalues)/samplews)
         else:
-            logsamplevalues = samplevalues - n.log(samplews)
+            logsamplevalues = samplevalues - np.log(samplews)
 
         # Anneal the new values a bit
         temp = self.params.get('is_temperature'+self.suffix, self.params.get('is_temperature',1.0))
-        assert n.isfinite(temp) and temp > 0
+        assert np.isfinite(temp) and temp > 0
         if temp != 1.0:
             logsamplevalues *= (1.0/temp)
-        logsamplevalues[n.logical_not(n.isfinite(logsamplevalues))] = -n.inf
+        logsamplevalues[np.logical_not(np.isfinite(logsamplevalues))] = -np.inf
         lse = logsumexp(logsamplevalues)
-        assert n.isfinite(lse)
+        assert np.isfinite(lse)
         logsamplevalues -= lse
         
-        expsamplevalues = n.exp(logsamplevalues)
+        expsamplevalues = np.exp(logsamplevalues)
 
         self.updates[dist] = (samples,logsamplevalues,expsamplevalues,self.domain,self.params,pinlier,testImg)
 
@@ -310,7 +310,7 @@ class FixedImportanceSampler():
             return
 
         # Get the update for the global distribution
-        for (im,upd) in self.updates.iteritems():
+        for (im,upd) in self.updates.items():
             if upd[6]:
                 # Test images aren't included in the global distribution
                 continue 

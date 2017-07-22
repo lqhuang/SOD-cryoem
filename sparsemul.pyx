@@ -3,7 +3,7 @@
 # Code ported from
 # https://github.com/scipy/scipy/blob/master/scipy/sparse/sparsetools/csr.h#L1010
 
-from six.moves import xrange
+# from six.moves import xrange
 
 import numpy as np
 cimport numpy as np
@@ -13,7 +13,7 @@ import scipy.sparse as sp
 def spdot(spmat, np.ndarray[np.float32_t, ndim=1] Xx, np.ndarray[np.float32_t, ndim=1] Yx):
     """ Computes the dot product sum of a sparse matrix in CSR format with a numpy vector. All float32.
     Equivalent to Y += spmat.dot(X) """
-    
+
     assert (spmat.format == 'csr')
         
     cdef unsigned int n_row = spmat.shape[0]
@@ -24,7 +24,7 @@ def spdot(spmat, np.ndarray[np.float32_t, ndim=1] Xx, np.ndarray[np.float32_t, n
     cdef unsigned int i, jj
     cdef np.float32_t sum
     
-    with nogil:    
+    with nogil:
         for i in xrange(n_row):
             sum = Yx[i]
             jj = Ap[i]

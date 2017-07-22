@@ -1,13 +1,14 @@
+from __future__ import absolute_import
+
 import numbers
 
-from .util import *
 from .finitesum import FiniteRunningSum
 from .logsumexp import logsumexp
 from .backgroundworker import BackgroundWorker
 from .params import Params
 from .output import Output, OutputStream
 from .gitutil import git_info_dump, git_get_SHA1
-
+from .util import *
 
 def format_timedelta(diff):
     if isinstance(diff, numbers.Real):

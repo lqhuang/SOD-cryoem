@@ -267,7 +267,7 @@ class CombinedCTFStack(CTFStackBase):
             if pardata is None:
                 pardata = stk.pardata
             else:
-                for k, v in stk.pardata.iteritems():
+                for k, v in stk.pardata.items():
                     if k not in pardata:
                         pardata[k] = num_imgs * [None]
                     pardata[k] += v

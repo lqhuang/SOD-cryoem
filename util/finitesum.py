@@ -1,4 +1,4 @@
-import numpy as n
+import numpy as np
 
 class FiniteRunningSum:
     def __init__(self,second_order=False,alt_sum=False):
@@ -30,20 +30,20 @@ class FiniteRunningSum:
             self.history_upds = N_sum
     
         self.w_sum = 0.0
-        self.val_sum = n.zeros_like(val)
+        self.val_sum = np.zeros_like(val)
 
         self.inds = {}
         self.curr_ind = 0
         self.prev_vals = {}
         if self.allow_decay:
-            self.prev_ws = n.zeros(N_sum)
+            self.prev_ws = np.zeros(N_sum)
         self.N_sum = N_sum
 
         if self.second_order:
             self.w2_sum = 0.0
-            self.val2_sum = n.zeros_like(val)
+            self.val2_sum = np.zeros_like(val)
             if self.allow_decay:
-                self.prev_w2s = n.zeros(N_sum)
+                self.prev_w2s = np.zeros(N_sum)
         
         if self.alt_sum:
             self.alt_sum_cnt = 0

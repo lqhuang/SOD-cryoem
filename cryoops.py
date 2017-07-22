@@ -1,4 +1,4 @@
-from __future__ import print_function, print_function
+from __future__ import print_function, division
 
 import numpy as np
 import pyximport; pyximport.install(
@@ -74,11 +74,10 @@ def compute_shift_phases(pts, N, rad):
 
 
 def compute_premultiplier(N, kernel, kernsize, scale=512):
-    krange = N / 2
-    koffset = (N / 2) * scale
+    krange = int(N / 2)
+    koffset = int((N / 2) * scale)
 
     x = np.arange(-scale * krange, scale * krange) / float(scale)
-
     if kernel == 'lanczos':
         a = kernsize / 2
         k = np.sinc(x) * np.sinc(x / a) * (np.abs(x) <= a)
@@ -96,7 +95,10 @@ def compute_premultiplier(N, kernel, kernsize, scale=512):
         assert False, 'Unknown kernel type'
 
     sk = np.fft.fftshift(np.fft.ifft(np.fft.ifftshift(k))).real
-    premult = 1.0 / (N * sk[(koffset - krange):(koffset + krange)])
+    if N % 2 == 0:
+        premult = 1.0 / (N * sk[(koffset - krange):(koffset + krange)])
+    else:
+        premult = 1.0 / (N * sk[(koffset - krange - 1):(koffset + krange)])
 
     return premult
 
@@ -112,3 +114,6 @@ if __name__ == '__main__':
     pm2 = compute_premultiplier(N, kern, kernsize, 8192)
 
     print(np.max(np.abs(pm1 - pm2)))
+
+    premult = compute_premultiplier(125, 'lanczos', 4)
+    print(premult.shape)
