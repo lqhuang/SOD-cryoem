@@ -2,9 +2,9 @@ from __future__ import print_function, division
 
 import os
 try:
-    import pickle as pkl  # python 3
+    import pickle as pickle  # python 3
 except ModuleNotFoundError:
-    import cPickle as pkl  # python 2
+    import cPickle as pickle  # python 2
 
 import numpy as np
 
@@ -216,12 +216,12 @@ class SAGDStep(base.BaseStep):
 
     def save_L0(self, params):
         with open(os.path.join(params['exp_path'], 'sagd_L0.pkl'), 'wb') as fp:
-            pkl.dump(self.L, fp, protocol=2)
+            pickle.dump(self.L, fp, protocol=2)
 
     def load_L0(self, params):
         try:
             with open(os.path.join(params['exp_path'], 'sagd_L0.pkl'), 'rb') as fp:
-                L0 = pkl.load(fp)
+                L0 = pickle.load(fp)
         except:
             L0 = params.get('sagd_L0', 1.0)
         return L0
