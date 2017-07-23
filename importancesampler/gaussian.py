@@ -1,4 +1,4 @@
-from fixed import FixedImportanceSampler
+from .fixed import FixedImportanceSampler
 from util import logsumexp
 import numpy as np
 

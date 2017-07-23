@@ -18,7 +18,7 @@ from util import format_timedelta
 
 try:
     import pickle
-except ModuleNotFoundError:
+except ImportError:
     import cPickle as pickle
 
 import numpy as np

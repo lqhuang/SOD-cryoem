@@ -1,8 +1,10 @@
+from __future__ import print_function, division
+
 import sys
 
 try:
     import pickle as pickle
-except ModuleNotFoundError:
+except ImportError:
     import cPickle as pickle
 
 
@@ -18,8 +20,8 @@ class OutputStream():
 
     def __call__(self, *arg):
         for a in arg:
-            print >>self.f, a,
-        print >>self.f, ''
+            print(a, file=self.f)
+        print('', file=self.f)
         self.f.flush()
 
     def __del__(self):

@@ -3,7 +3,7 @@ from __future__ import print_function, division
 from threading import Lock
 import numpy as np
 
-import mrc
+from . import mrc
 import density
 import geometry
 from cryoem import resize_ndarray

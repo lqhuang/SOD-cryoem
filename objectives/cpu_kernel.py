@@ -1,14 +1,20 @@
 from __future__ import print_function, division
 
-import numpy as np
+from six.moves import xrange
+
 from threading import Thread, Lock
-from Queue import Queue
 import time, multiprocessing
+try:
+    from Queue import Queue  # python 2
+except ImportError:
+    from queue import Queue  # python 3
+
+import numpy as np
 
 from cryoem import getslices
 
 import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
-import objective_kernels
+from . import objective_kernels
 
 from objectives.likelihood import UnknownRSKernel
 

@@ -1,6 +1,6 @@
 import numpy as np
-from sagd import find_L
-from base import *
+from .sagd import find_L
+from .base import *
 
 class SGDMomentumStep(BaseStep):
     def __init__(self,predGrad,adaptL=False):

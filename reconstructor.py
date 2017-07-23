@@ -21,7 +21,10 @@ import pickle
 import socket
 
 from threading import Thread
-from Queue import Queue
+try:
+    from Queue import Queue  # python 2
+except ImportError:
+    from queue import Queue  # python 3
 
 from optimizers.sagd import SAGDStep
 from optimizers.sgd import SGDMomentumStep
@@ -314,11 +317,11 @@ class CryoOptimizer(BackgroundWorker):
 
         # Paramter setup ---------------------------------------------------
         # search above expbase for params files
-        _,_,filenames = os.walk(opj(expbase,'../')).next()
+        _,_,filenames = next(os.walk(opj(expbase,'../')))
         self.paramfiles = [opj(opj(expbase,'../'), fname) \
                            for fname in filenames if fname.endswith('.params')]
         # search expbase for params files
-        _,_,filenames = os.walk(opj(expbase)).next()
+        _,_,filenames = next(os.walk(opj(expbase)))
         self.paramfiles += [opj(expbase,fname)  \
                             for fname in filenames if fname.endswith('.params')]
         if 'local.params' in filenames:
@@ -398,7 +401,8 @@ class CryoOptimizer(BackgroundWorker):
                      "    Kernel: " + self.params['kernel'])
         self.ostream("Started on " + socket.gethostname() + \
                      "    At: " + time.strftime('%B %d %Y: %I:%M:%S %p'))
-        self.ostream("Git SHA1: " + gitutil.git_get_SHA1())
+        print('gitutil:', gitutil.git_get_SHA1().decode('utf-8'))
+        self.ostream("Git SHA1: " + gitutil.git_get_SHA1().decode('utf-8'))
         self.ostream(80*"=")
         gitutil.git_info_dump(opj(self.outbase, 'gitinfo'))
         self.startdatetime = datetime.now()
@@ -480,7 +484,7 @@ class CryoOptimizer(BackgroundWorker):
         # Objective function setup --------------------------------------------
         param_type = self.cparams.get('parameterization','real')
         cplx_param = param_type in ['complex','complex_coeff','complex_herm_coeff']
-        self.like_func = UnknownRSLikelihood()  # eval_objective(self.cparams['likelihood'])
+        self.like_func = eval_objective(self.cparams['likelihood'])
         self.prior_func = eval_objective(self.cparams['prior'])
 
         if self.cparams.get('penalty',None) is not None:
@@ -711,7 +715,7 @@ class CryoOptimizer(BackgroundWorker):
         self.diagout.output(global_phi_I=self.sampler_I.get_global_dist())
         self.diagout.output(global_phi_S=self.sampler_S.get_global_dist())
         timing['is_update'] = time.time() - tic_isupdate
-        
+
         # Output basic diagnostics
         tic_diagnostics = time.time()
         self.diagout.output(iteration=self.iteration, epoch=epoch, cepoch=cepoch)

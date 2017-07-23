@@ -1,6 +1,6 @@
 #cython: boundscheck=False
 
-from six.moves import xrange
+# from six.moves import xrange
 
 import numpy as n
 cimport numpy as n

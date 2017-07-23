@@ -1,3 +1,3 @@
-__all__ = [ 'sagd', 'sgd' ]
+__all__ = [ 'sagd', 'sgd']
 
 
