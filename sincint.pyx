@@ -23,7 +23,7 @@
 
 import numpy as n
 cimport numpy as n
-from geom.geom import *
+import geometry
 import scipy.sparse as sp
 
 DTYPE = n.float32
@@ -230,7 +230,7 @@ def compute_interpolation_matrix(DTYPE_t[:,:,:] Rs, int N_dst, int N_src, float 
         # even kernel size - floor the location to the nearest grid
         truncfunc = &floor_vec
     
-    cdef DTYPE_t[:,:] im_pts = gencoords(N_dst,imD,rad)
+    cdef DTYPE_t[:,:] im_pts = geometry.gencoords(N_dst,imD,rad)
     cdef unsigned int N_T = im_pts.shape[0]
     cdef unsigned int N_R = Rs.shape[0]
     cdef unsigned int N_sym = 1+symRs.shape[0] if symRs is not None else 1
@@ -241,7 +241,7 @@ def compute_interpolation_matrix(DTYPE_t[:,:,:] Rs, int N_dst, int N_src, float 
 
     cdef unsigned int intksize = kernsize**intD
     # interpolation tap points (about 0,0,0)
-    cdef ITYPE_t[:,:] p = n.require(gencoords(kernsize,intD).reshape((intksize,intD)),dtype=ITYPE)+1
+    cdef ITYPE_t[:,:] p = n.require(geometry.gencoords(kernsize,intD).reshape((intksize,intD)),dtype=ITYPE)+1
     # WARNING: This assumes that the model is stored with order='C'
     cdef ITYPE_t[:] strides = n.array([N_src**(intD-1-i) for i in range(intD)], dtype=ITYPE)
     # pidx is the linear index offsets of the tap points
@@ -328,7 +328,7 @@ def map_fspace_coordinates(CDTYPE_t[:,:,:] V, DTYPE_t[:,:] pts,
 
     cdef unsigned int intksize = kernsize**3
     cdef DTYPE_t[:] point = n.empty((3), dtype=DTYPE)
-    cdef ITYPE_t[:,:] p = n.require(gencoords(kernsize,3).reshape((intksize,3)),dtype=ITYPE)+1
+    cdef ITYPE_t[:,:] p = n.require(geometry.gencoords(kernsize,3).reshape((intksize,3)),dtype=ITYPE)+1
     cdef ITYPE_t[:] int_pti = n.empty((3), dtype=ITYPE)
     cdef UITYPE_t[:] vpti = n.empty((3), dtype=UITYPE)
     cdef DTYPE_t[:] vals = n.empty((intksize), dtype=DTYPE)
@@ -379,7 +379,7 @@ def symmetrize_fspace_volume(CDTYPE_t[:,:,:] V,
     
     cdef unsigned int intksize = kernsize**3
     # interpolation tap points (about 0,0,0)
-    cdef ITYPE_t[:,:] p = n.require(gencoords(kernsize,3).reshape((intksize,3)),dtype=ITYPE)+1
+    cdef ITYPE_t[:,:] p = n.require(geometry.gencoords(kernsize,3).reshape((intksize,3)),dtype=ITYPE)+1
 
     cdef ITYPE_t N = V.shape[0] # THIS MUST BE A SIGNED TYPE
     assert V.shape[1] == N and V.shape[2] == N
@@ -620,7 +620,7 @@ def symmetrize_volume_z(DTYPE_t[:,:,:] V,
 
 def gentrunctofull(N=128, rad=0.3):
     """ Generates a sparse matrix operator that maps truncated image fourier coefficients (R) back to a full N**2 vector """
-    xy = gencoords(N,2)
+    xy = geometry.gencoords(N,2)
     r2 = n.sum(xy**2,axis=1)
     active_xy = r2 < (rad*N/2.0)**2
     R = sum(active_xy)

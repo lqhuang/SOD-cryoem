@@ -4,7 +4,7 @@ import numpy as np
 import pyximport; pyximport.install(
     setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
-from geom import geom
+import geometry
 
 
 precomputed_Rs = {}
@@ -17,7 +17,7 @@ def compute_projection_matrix(projdirs, N, kern, kernsize, rad, projdirtype='dir
             Rs = precomputed_Rs[dirhash]
         else:
             Rs = np.vstack(
-                [geom.rotmat3D_dir(d)[:, 0:2].reshape((1, 3, 2)) for d in projdirs])
+                [geometry.rotmat3D_dir(d)[:, 0:2].reshape((1, 3, 2)) for d in projdirs])
             if onlyRs:
                 precomputed_Rs[dirhash] = Rs
     elif projdirtype == 'rots':
@@ -51,7 +51,7 @@ def compute_inplanerot_matrix(thetas, N, kern, kernsize, rad, N_src=None, onlyRs
         Rs = precomputed_RIs[dirhash]
     else:
         Rs = np.vstack(
-            [scale * geom.rotmat2D(np.require(th, dtype=np.float32)).reshape((1, 2, 2)) \
+            [scale * geometry.rotmat2D(np.require(th, dtype=np.float32)).reshape((1, 2, 2)) \
             for th in thetas])
         if onlyRs:
             precomputed_RIs[dirhash] = Rs
@@ -62,7 +62,7 @@ def compute_inplanerot_matrix(thetas, N, kern, kernsize, rad, N_src=None, onlyRs
 
 
 def compute_shift_phases(pts, N, rad):
-    xy = geom.gencoords(N, 2, rad)
+    xy = geometry.gencoords(N, 2, rad)
     N_T = xy.shape[0]
     N_S = pts.shape[0]
 

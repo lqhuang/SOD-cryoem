@@ -14,7 +14,7 @@ from cryoio.ctfstack import CTFStack, GeneratedCTFStack
 from cryoem import cryoem
 import density
 import cryoops
-from geom import geom
+import geometry
 from util import format_timedelta
 
 try:
@@ -98,11 +98,11 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         pt = np.random.randn(3)
         pt /= np.linalg.norm(pt)
         psi = 2 * np.pi * np.random.rand()
-        EA = geom.genEA(pt)[0]
+        EA = geometry.genEA(pt)[0]
         EA[2] = psi
         shift = np.random.randn(2) * shift_sigma
 
-        R = geom.rotmat3D_EA(*EA)[:, 0:2]
+        R = geometry.rotmat3D_EA(*EA)[:, 0:2]
         slop = cryoops.compute_projection_matrix(
             [R], N, kernel, ksize, rad, 'rots')
         S = cryoops.compute_shift_phases(shift.reshape((1, 2)), N, rad)[0]

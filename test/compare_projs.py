@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 
 from cryoio import mrc
 import density, cryoops
-from geom import geom, healpix
+import geometry
+from quadrature import healpix
 from cryoem import cryoem
 
 import pyximport; pyximport.install(
@@ -15,7 +16,7 @@ M = mrc.readMRC('./particle/EMD-6044.mrc')
 # M = M / np.sum(M)
 M = M[:124, :124, :124]
 
-mrc.writeMRC('./particle/EMD-6044-cropped.mrc', M)
+mrc.writeMRC('./particle/EMD-6044-cropped.mrc', M, psz=3.0)
 
 N = M.shape[0]
 print(M.shape)
@@ -23,7 +24,7 @@ rad = 1
 kernel = 'lanczos'
 ksize = 4
 
-xy, trunc_xy, truncmask = geom.gencoords(N, 2, rad, True)
+xy, trunc_xy, truncmask = geometry.gencoords(N, 2, rad, True)
 # premult = cryoops.compute_premultiplier(N, kernel='lanczos', kernsize=6)
 premult = cryoops.compute_premultiplier(N, kernel, ksize)
 TtoF = sincint.gentrunctofull(N=N, rad=rad)
@@ -33,7 +34,7 @@ prefM = density.real_to_fspace(premult.reshape(
         (1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * M)
 
 EAs_grid = healpix.gen_EAs_grid(nside=2, psi_step=360)
-Rs = [geom.rotmat3D_EA(*EA)[:, 0:2] for EA in EAs_grid]
+Rs = [geometry.rotmat3D_EA(*EA)[:, 0:2] for EA in EAs_grid]
 slice_ops = cryoops.compute_projection_matrix(Rs, N, kern='lanczos', kernsize=ksize, rad=rad, projdirtype='rots')
 
 slices_sampled = cryoem.getslices(fM, slice_ops).reshape((EAs_grid.shape[0], trunc_xy.shape[0]))

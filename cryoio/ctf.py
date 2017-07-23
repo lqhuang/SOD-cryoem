@@ -1,9 +1,8 @@
 from __future__ import print_function, division
 
 from util import memoize
-import geom
+import geometry
 import numpy as np
-import exceptions
 
 
 def envelope_function(freq_radius, bfactor):
@@ -50,13 +49,13 @@ def compute_ctf(freqs, rots, akv, cs, wgh, dfmid1f, dfmid2f, angastf, dscale, bf
 
 @memoize
 def compute_full_ctf(rots, N, psize, akv, csf, wgh, dfmid1, dfmid2, angastf, dscale, bfactor):
-    freqs = geom.gencoords(N, 2) / (N * psize)
+    freqs = geometry.gencoords(N, 2) / (N * psize)
     return compute_ctf(freqs, rots, akv, csf, wgh, dfmid1, dfmid2, angastf, dscale, bfactor)
 
 
 class CTFBase:
     def compute(self, freqs, rots=None):
-        raise exceptions.NotImplementedError()
+        raise NotImplementedError()
 
 
 class ParametricCTF(CTFBase):
@@ -110,7 +109,7 @@ if __name__ == '__main__':
     N = 512
     psz = 5.6
     rad = 0.25
-    fcoords = geom.gencoords(N, 2, rad) / (N * psz)
+    fcoords = geometry.gencoords(N, 2, rad) / (N * psz)
     ctf1_rot = compute_full_ctf(
         rots, N, psz, akv, cs, wgh, df1, df2, angast, dscale, None)
     ctf2_full = compute_full_ctf(

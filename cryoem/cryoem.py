@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 
 import numpy as np
-from geom.geom import gencoords
+from geometry import gencoords
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
 

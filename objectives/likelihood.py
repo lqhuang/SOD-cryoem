@@ -13,7 +13,7 @@ from cryoio import ctf
 import cryoem, quadrature, density, cryoops
 
 from symmetry import get_symmetryop
-from geom import gencoords
+from geometry import gencoords
 from cryoem import getslices
 
 class UnknownRSLikelihood(Objective):

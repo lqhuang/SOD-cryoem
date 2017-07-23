@@ -11,7 +11,7 @@ from scipy.ndimage.interpolation import rotate as imrotate
 
 from cryoio import star, mrc
 from cryoem import relion, xmipp, cryoem
-from geom import geom
+import geometry
 
 
 """
@@ -32,7 +32,7 @@ def gen_exp_samples(num_EAs, phantompath, data_dst):
         pt = np.random.randn(3)
         pt /= np.linalg.norm(pt)
         psi = 2 * np.pi * np.random.rand()
-        EA = geom.genEA(pt)[0]
+        EA = geometry.genEA(pt)[0]
         EA[2] = psi
         EAs.append(np.rad2deg(EA))
 

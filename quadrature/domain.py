@@ -1,7 +1,7 @@
 import numpy as np
 
 import cryoops as cops
-import geom
+import geometry
 
 class FixedPlanarDomain():
     def __init__(self,pts,res):
@@ -141,11 +141,11 @@ class FixedSO3Domain():
 
     def compute_operator(self,interp_params,inds=None):
         if inds is None:
-            Rs = np.array([[geom.rotmat3D_dir(d,t)[:,0:2] for t in self.thetas] for d in self.dirs])
+            Rs = np.array([[geometry.rotmat3D_dir(d,t)[:,0:2] for t in self.thetas] for d in self.dirs])
             Rs = Rs.reshape((-1,3,2))        
         else:
             N_I = len(self.thetas)
-            Rs = np.array([geom.rotmat3D_dir(self.dirs[i/N_I],self.thetas[np.mod(i,N_I)])[:,0:2] for i in inds])
+            Rs = np.array([geometry.rotmat3D_dir(self.dirs[i/N_I],self.thetas[np.mod(i,N_I)])[:,0:2] for i in inds])
 
         return cops.compute_projection_matrix(Rs,sym=self.sym,projdirtype='rots',**interp_params)
 
