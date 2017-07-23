@@ -222,7 +222,7 @@ class CryoOptimizer(BackgroundWorker):
         diag[prefix+'_correlation'] = res['correlation']
         diag[prefix+'_power'] = res['power']
 
-#         self.ostream("    RMS Error: %g" % (sigma/n.sqrt(self.cryodata.noise_var)))
+        # self.ostream("    RMS Error: %g" % (sigma/n.sqrt(self.cryodata.noise_var)))
         self.ostream("    RMS Error: %g, Signal: %g" % (sigma/np.sqrt(self.cryodata.noise_var), \
                                                         sigma_prior/np.sqrt(self.cryodata.noise_var)))
         self.ostream("    Effective # of R / I / S:     %.2f / %.2f / %.2f " %\
@@ -351,7 +351,6 @@ class CryoOptimizer(BackgroundWorker):
         else:
             ctfstk = CombinedCTFStack([CTFStack(cctfpath,mscope_params) for cctfpath in self.ctfpath])
 
-
         self.cryodata = CryoDataset(imgstk,ctfstk)
         self.cryodata.compute_noise_statistics()
         if self.params.get('window_images',True):
@@ -374,7 +373,6 @@ class CryoOptimizer(BackgroundWorker):
             self.cryodata.normalize_dataset()
 
         self.voxel_size = self.cryodata.pixel_size
-
 
         # Iterations setup -------------------------------------------------
         self.iteration = 0 
@@ -619,9 +617,9 @@ class CryoOptimizer(BackgroundWorker):
         M_mean = M_sum/N**3
         M_max = self.M.max()
         M_min = self.M.min()
-#         self.ostream("  Density (min/max/avg/sum/zeros): " +
-#                      "%.2e / %.2e / %.2e / %.2e / %g " %
-#                      (M_min, M_max, M_mean, M_sum, M_zeros))
+        # self.ostream("  Density (min/max/avg/sum/zeros): " +
+        #              "%.2e / %.2e / %.2e / %.2e / %g " %
+        #              (M_min, M_max, M_mean, M_sum, M_zeros))
         self.statout.output(total_density=[M_sum],
                             avg_density=[M_mean],
                             nonzero_density=[M_zeros],
@@ -703,7 +701,6 @@ class CryoOptimizer(BackgroundWorker):
                             norm_density=[M_norm])
         timing['step_stats'] = time.time() - tic_stepstats
 
-
         # Update import sampling distributions
         tic_isupdate = time.time()
         self.sampler_R.perform_update()
@@ -768,12 +765,10 @@ class CryoOptimizer(BackgroundWorker):
                 self.io_queue.put(( 'cp', self.likeout.fname, self.likeout.fname+'-{0:06}'.format(self.iteration) ))
                 self.io_queue.put(( 'cp', opj(self.outbase,'model.mrc'), opj(self.outbase,'model-{0:06}.mrc'.format(self.iteration)) ))
             timing['save'] = time.time() - tic_save
-                
-            
+
         time_total = time.time() - tic_mini
         self.ostream("  Minibatch Total - %.2f seconds                         Total Runtime - %s" %
                      (time_total, format_timedelta(datetime.now() - self.startdatetime) ))
 
-        
         return self.iteration < self.cparams.get('max_iterations',np.inf) and \
                cepoch < self.cparams.get('max_epochs',np.inf)
