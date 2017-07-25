@@ -3,6 +3,8 @@
 #
 # Visualization code for cryoem
 
+from __future__ import print_function, division
+
 from mayavi import mlab
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
@@ -10,11 +12,11 @@ from matplotlib import colors
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogFormatter, LogFormatterExponent, LogFormatterMathtext, LogLocator
 
-from monitor import ExpMonitor, ExpSetMonitor
+import numpy as np
 
+from monitor import ExpMonitor, ExpSetMonitor
 from cryoio import ctf
-import cryoem as c
-import numpy as n
+import cryoem
 from cryoio import mrc
 import quadrature
 from objectives import eval_objective
@@ -75,11 +77,11 @@ class SlicePlot:
     def update_display(self):
         if self.M is None: return
 
-#        frame = n.around(self.sframe.val)
-#        self.im.set_data(self.M[:,:,frame].T)
+        # frame = np.around(self.sframe.val)
+        # self.im.set_data(self.M[:,:,frame].T)
 
         val = self.sframe.val
-        frame0 = n.floor(val)
+        frame0 = np.floor(val)
         frame1 = frame0 + 1
 
         curr_slice = (frame1-val)*self.M[:,:,frame0].T
@@ -184,7 +186,7 @@ class SetVisualizer(ExpSetMonitor):
             max_it = min(max_it,x_test[-1])
         plt.ylabel('Test NLP', fontsize=fsize)
         plt.xlabel(xval, fontsize=fsize)
-#        plt.ylim((end_lp - 0.05*n.abs(init_lp-end_lp),init_lp - 0.2*n.abs(init_lp - end_lp)))
+#        plt.ylim((end_lp - 0.05*np.abs(init_lp-end_lp),init_lp - 0.2*np.abs(init_lp - end_lp)))
         plt.xlim((None,max_it))
         plt.grid()
         plt.legend(fontsize=fsize)
@@ -240,7 +242,7 @@ class SetVisualizer(ExpSetMonitor):
             max_it = min(max_it,x_test[-1])
         plt.ylabel('Test Error', fontsize=fsize)
         plt.xlabel(xval, fontsize=fsize)
-#        plt.ylim((end_lp - 0.05*n.abs(init_lp-end_lp),init_lp - 0.2*n.abs(init_lp - end_lp)))
+        # plt.ylim((end_lp - 0.05*np.abs(init_lp-end_lp),init_lp - 0.2*np.abs(init_lp - end_lp)))
         plt.xlim((None,max_it))
         plt.grid()
         plt.legend(fontsize=fsize)
@@ -261,7 +263,7 @@ class SetVisualizer(ExpSetMonitor):
             max_it = min(max_it,x_test[-1])
         plt.ylabel('Train Error', fontsize=fsize)
         plt.xlabel(xval, fontsize=fsize)
-#        plt.ylim((end_lp - 0.05*n.abs(init_lp-end_lp),init_lp - 0.2*n.abs(init_lp - end_lp)))
+        # plt.ylim((end_lp - 0.05*np.abs(init_lp-end_lp),init_lp - 0.2*np.abs(init_lp - end_lp)))
         plt.xlim((None,max_it))
         plt.grid()
         plt.legend(fontsize=fsize)
@@ -290,7 +292,7 @@ class Visualizer(ExpMonitor):
         self.curr_contours = []
 
         self.stats_xval = 'iteration'
-#        self.updatevis()
+        # self.updatevis()
     
     def get_figure(self,figid):
         if figid not in self.figures:
@@ -382,22 +384,22 @@ class Visualizer(ExpMonitor):
             env_max = max(env_max,bfactor_env.max())
             env_min = min(env_min,bfactor_env.min())
         else:
-            fs = n.linspace(0,1.0/(2.0*resolution),N/2)
+            fs = np.linspace(0,1.0/(2.0*resolution),N/2)
             bfactor_env = 1.0
 
-        ra_mle_envelope = c.rotational_average(envelope_mle,maxRadius=N/2)
+        ra_mle_envelope = cryoem.rotational_average(envelope_mle,maxRadius=N/2)
         plt.plot(fs[0:int(rad*N/2)],ra_mle_envelope[0:int(rad*N/2)],label='ML')
         env_max = max(env_max,ra_mle_envelope.max())
         env_min = min(env_min,ra_mle_envelope.min())
         if have_exp:
-            ra_exp_envelope = c.rotational_average(exp_envelope,maxRadius=N/2) 
+            ra_exp_envelope = cryoem.rotational_average(exp_envelope,maxRadius=N/2) 
             plt.plot(fs[0:N/2],ra_exp_envelope[0:N/2],label='MAP',linewidth=2)
             env_max = max(env_max,ra_exp_envelope.max())
             env_min = min(env_min,ra_exp_envelope.min())
         plt.legend()
         plt.grid()
 
-        plt.plot((rad/(2.0*resolution))*n.ones((2,)), n.array([env_min,env_max]))
+        plt.plot((rad/(2.0*resolution))*np.ones((2,)), np.array([env_min,env_max]))
             
         plt.suptitle(name + ' Envelope')
         
@@ -407,17 +409,17 @@ class Visualizer(ExpMonitor):
 
         name = cparams['name']
 
-#         (x_train,sigma_train) = self.get_statistic(yval = 'sigma', xval = self.stats_xval, dset = 'train')
+        # (x_train,sigma_train) = self.get_statistic(yval = 'sigma', xval = self.stats_xval, dset = 'train')
         (x_total,sigma_total) = self.get_statistic(yval = 'sigma', xval = self.stats_xval)
         (x_test,sigma_test) = self.get_statistic(yval = 'sigma', xval = self.stats_xval, dset = 'test')
 
         plt.figure(cfig.number)
         plt.clf()
 
-#         plt.plot(x_train,sigma_train,label='Train',linewidth=2,linestyle='--')
+        # plt.plot(x_train,sigma_train,label='Train',linewidth=2,linestyle='--')
         plt.plot(x_total,sigma_total,label='Total',linewidth=4)
         plt.plot(x_test,sigma_test,label='Test',linewidth=2,marker='o')
-#         plt.yscale('log',basey=2)
+        # plt.yscale('log',basey=2)
         plt.legend()
         plt.grid()
         plt.title(name + ' Error')
@@ -438,12 +440,12 @@ class Visualizer(ExpMonitor):
         imextent = [startI-(N+1.0)/2,endI-(N+1.0)/2,startI-(N+1.0)/2,endI-(N+1.0)/2]
         imextent = [e/(2.0*vox_size)/(N/2) for e in imextent]
         sigma_est = cparams['sigma']
-        sigma_mle = n.sqrt(cdiag['sigma2_mle'])
-        train_sigma_est = n.sqrt(cdiag['train_sigma2_est']).reshape((N,N))
-        test_sigma_est = n.sqrt(cdiag['test_sigma2_est']).reshape((N,N))
-        showsigma = isinstance(sigma_est,n.ndarray)
-        vmin = min([n.min(sigma_est),sigma_mle[startI:endI,startI:endI].min()])
-        vmax = max([n.max(sigma_est),sigma_mle[startI:endI,startI:endI].max()])
+        sigma_mle = np.sqrt(cdiag['sigma2_mle'])
+        train_sigma_est = np.sqrt(cdiag['train_sigma2_est']).reshape((N,N))
+        test_sigma_est = np.sqrt(cdiag['test_sigma2_est']).reshape((N,N))
+        showsigma = isinstance(sigma_est,np.ndarray)
+        vmin = min([np.min(sigma_est),sigma_mle[startI:endI,startI:endI].min()])
+        vmax = max([np.max(sigma_est),sigma_mle[startI:endI,startI:endI].max()])
         
         imshow_kws = { 'interpolation':'nearest', \
                        'vmin':vmin, 'vmax':vmax, 'extent':imextent, \
@@ -454,12 +456,12 @@ class Visualizer(ExpMonitor):
         plt.clf()
 
         plt.subplot(2,1,1)
-        raps = n.sqrt(c.rotational_average(train_sigma_est**2))
-        fs = n.linspace(0,(len(raps)-1)/(N/2.0)/(2.0*vox_size),len(raps))
+        raps = np.sqrt(cryoem.rotational_average(train_sigma_est**2))
+        fs = np.linspace(0,(len(raps)-1)/(N/2.0)/(2.0*vox_size),len(raps))
         plt.plot(fs,raps,label='Training RMSE')
 
-        raps = n.sqrt(c.rotational_average(test_sigma_est**2))
-        fs = n.linspace(0,(len(raps)-1)/(N/2.0)/(2.0*vox_size),len(raps))
+        raps = np.sqrt(cryoem.rotational_average(test_sigma_est**2))
+        fs = np.linspace(0,(len(raps)-1)/(N/2.0)/(2.0*vox_size),len(raps))
         plt.plot(fs,raps,label='Testing RMSE')
         plt.legend()
         plt.grid()
@@ -479,8 +481,8 @@ class Visualizer(ExpMonitor):
 
         plt.subplot(2,1,1)
         if showsigma:
-            raps = n.sqrt(c.rotational_average(sigma_est**2))
-            fs = n.linspace(0,(len(raps)-1)/(N/2.0)/(2.0*vox_size),len(raps))
+            raps = np.sqrt(cryoem.rotational_average(sigma_est**2))
+            fs = np.linspace(0,(len(raps)-1)/(N/2.0)/(2.0*vox_size),len(raps))
         else:
             raps = [sigma_est,sigma_est]
             fs = [fs[0],fs[-1]]
@@ -510,8 +512,8 @@ class Visualizer(ExpMonitor):
         lines += ax1.plot(x_test,lp_test,label='Test LP', linewidth=2, marker='o', color='g')
         
         if 'logp' in cstat:
-#             (x_train,lp_train) = self.get_statistic(yval='logp', xval = self.stats_xval, dset = 'train')
-#             lines += ax1.plot(x_train,lp_train,label='Train LP',linewidth=2, linestyle='--', color='b')
+            # (x_train,lp_train) = self.get_statistic(yval='logp', xval = self.stats_xval, dset = 'train')
+            # lines += ax1.plot(x_train,lp_train,label='Train LP',linewidth=2, linestyle='--', color='b')
             (x_train,lp_train) = self.get_statistic(yval='logp', xval = self.stats_xval)
         else:
             (x_train,lp_train) = self.get_statistic(yval='logp', xval = self.stats_xval, dset = 'train', smooth_window=num_batches)
@@ -522,7 +524,7 @@ class Visualizer(ExpMonitor):
 
         (x_stepsize,stepsize) = self.get_statistic(yval = 'step_size', xval = self.stats_xval)
         lines += ax2.plot(x_stepsize,stepsize,label='Step Size', color='r', linestyle='-', linewidth=1)
-#         ax2.set_yscale('log',basey=2)
+        # ax2.set_yscale('log',basey=2)
 
         labels = [l.get_label() for l in lines]
         plt.legend(lines,labels)
@@ -548,25 +550,25 @@ class Visualizer(ExpMonitor):
         plt.suptitle(name + ' Density Statistics')
 
         nHistBins = 0.5*self.M.shape[0]
-        logprobScale = n.log(self.M.size/nHistBins)
+        logprobScale = np.log(self.M.size/nHistBins)
         plt.subplot(2,1,1)
         plt.hist(self.M.reshape((-1,)),bins=nHistBins,log=True)
         histxLims = plt.xlim()
         histyLims = plt.ylim()
-        vals = n.linspace(histxLims[0],histxLims[1],1000)
-        plt.plot(vals,n.exp(logprobScale-prior.scalar_eval(vals)))
+        vals = np.linspace(histxLims[0],histxLims[1],1000)
+        plt.plot(vals,np.exp(logprobScale-prior.scalar_eval(vals)))
         plt.xlim(histxLims)
         plt.ylim(histyLims)
         plt.title('Voxel Histogram + Prior')
 
         plt.subplot(2,2,3)
-        plt.hist(n.absolute(self.fM).reshape((-1,)),bins=nHistBins,log=True)
+        plt.hist(np.absolute(self.fM).reshape((-1,)),bins=nHistBins,log=True)
         plt.title('Power Histogram')
         (fs,raps) = rot_power_spectra(self.fM,resolution=resolution)
         plt.subplot(2,2,4)
         plt.plot(fs/(N/2.0)/(2.0*resolution),raps,label='RAPS')
-        plt.plot((rad/(2.0*resolution))*n.ones((2,)), 
-                  n.array([raps[raps>0].min(),raps.max()]))
+        plt.plot((rad/(2.0*resolution))*np.ones((2,)), 
+                  np.array([raps[raps>0].min(),raps.max()]))
         plt.yscale('log')
         plt.title('Rotationally Averaged Power Spectra')
 
@@ -602,21 +604,21 @@ class Visualizer(ExpMonitor):
 
         if sym is None:
             assert quad_sym is None
-            alignedM,R = c.align_density(self.M)
+            alignedM,R = cryoem.align_density(self.M)
             if self.show_grad:
-                aligneddM = c.rotate_density(self.dM,R)
+                aligneddM = cryoem.rotate_density(self.dM,R)
             else:
                 aligneddM = None
         else:
             alignedM, aligneddM = self.M, self.dM
-            R = n.identity(3)
+            R = np.identity(3)
 
         self.alignedM,self.aligneddM,self.alignedR = alignedM,aligneddM,R
         self.fM = density.real_to_fspace(self.M)
 
         self.figMslices.set_data(alignedM)
 
-        glbl_phi_R = n.array([cdiag['global_phi_R']]).ravel()
+        glbl_phi_R = np.array([cdiag['global_phi_R']]).ravel()
         if len(glbl_phi_R) == 1:
             glbl_phi_R = None
         glbl_phi_I = cdiag['global_phi_I']
@@ -630,7 +632,7 @@ class Visualizer(ExpMonitor):
                                      cparams.get('quad_undersample',1.0))
             quad_degree_R,_ = quad_R.compute_degree(N,rad,usFactor_R)
         origlebDirs,_ = quad_R.get_quad_points(quad_degree_R,quad_sym)
-        lebDirs = n.dot(origlebDirs,R)
+        lebDirs = np.dot(origlebDirs,R)
 
         # Get shift quadrature
         quad_S = quadrature.quad_schemes[('shift',cparams.get('quad_type_S','hermite'))]
@@ -653,11 +655,11 @@ class Visualizer(ExpMonitor):
         mlab.figure(self.fig1)
         mlab.clf()
         self.curr_contours = plot_density(alignedM, self.contours, levels)
-#         dispPhiR = glbl_phi_R
-#         dispDirs = lebDirs
-#         plot_directions(alignedM.shape[0]*dispDirs + alignedM.shape[0]/2.0,
-#                         dispPhiR,
-#                         0, vmax_R)
+        # dispPhiR = glbl_phi_R
+        # dispDirs = lebDirs
+        # plot_directions(alignedM.shape[0]*dispDirs + alignedM.shape[0]/2.0,
+        #                 dispPhiR,
+        #                 0, vmax_R)
         mlab.view(focalpoint=[alignedM.shape[0]/2.0,alignedM.shape[0]/2.0,alignedM.shape[0]/2.0],distance=1.5*alignedM.shape[0])
 
 
@@ -681,8 +683,8 @@ class Visualizer(ExpMonitor):
             (fs,raps) = rot_power_spectra(self.dM,resolution=resolution)
             plt.subplot(1,2,2)
             plt.plot(fs/(N/2.0)/(2.0*resolution),raps,label='RAPS')
-            plt.plot((rad/(2.0*resolution))*n.ones((2,)), 
-                     n.array([raps[raps > 0].min(),raps.max()]))
+            plt.plot((rad/(2.0*resolution))*np.ones((2,)), 
+                     np.array([raps[raps > 0].min(),raps.max()]))
             plt.yscale('log')
             plt.title('RAPS Step')
 
@@ -703,12 +705,12 @@ class Visualizer(ExpMonitor):
 
 ### ------------------------- UTILITY FUNCTIONS FOR PLOTTING ------------------------
 def plot_importance_dists(name,quadDirs,pts,phi_R,phi_I,phi_S,vmax_R,vmax_S):
-    if isinstance(phi_I,n.ndarray):
+    if isinstance(phi_I,np.ndarray):
         dispI = True
     else:
         dispI = False
 
-    if isinstance(phi_S,n.ndarray) and pts.shape[0] > 2:
+    if isinstance(phi_S,np.ndarray) and pts.shape[0] > 2:
         dispS = True
     else:
         dispS = False
@@ -722,8 +724,8 @@ def plot_importance_dists(name,quadDirs,pts,phi_R,phi_I,phi_S,vmax_R,vmax_S):
 
     if dispI:
         plt.subplot(2,2,3,polar=True)
-        plt.plot(n.linspace(0, 2.0*n.pi, phi_I.size+1, endpoint=True),
-                 n.hstack([phi_I,phi_I[0]]))
+        plt.plot(np.linspace(0, 2.0*np.pi, phi_I.size+1, endpoint=True),
+                 np.hstack([phi_I,phi_I[0]]))
         plt.gca().set_rmax(1.1*phi_I.max())
         plt.title('Inplane Distribution')
 
@@ -752,22 +754,22 @@ def plot_density(s, contours, levels=[0.2,0.5,0.8], colors= [(0,1,0),(0,0,1),(1,
     for cont,c,o in zip(curr_contours, itertools.cycle(colors), itertools.cycle(opacity)):
         mlab.pipeline.iso_surface(src, contours=[cont,], opacity=o, color=c)
 
-#    mlab.text(0.1,0.9,'min: %15.2e' % (s.min()), color=(0,0,0), width=0.2)
-#    mlab.text(0.1,0.85,'max: %15.2e' % (s.max()), color=(0,0,0), width=0.2)
-    print s.min(), s.max()
+    # mlab.text(0.1,0.9,'min: %15.2e' % (s.min()), color=(0,0,0), width=0.2)
+    # mlab.text(0.1,0.85,'max: %15.2e' % (s.max()), color=(0,0,0), width=0.2)
+    print(s.min(), s.max())
     return curr_contours
 
 def plot_directions(dirs,vals,vmin=None,vmax=None):
     if vmin != None or vmax != None:
-        vals = n.clip(vals,vmin,vmax)
-    mlab.points3d(dirs[:,0],dirs[:,1],dirs[:,2],n.log(1e-10+vals),scale_mode='none',scale_factor=5.0,opacity=0.2)
-#    pts = mlab.pipeline.scalar_scatter(dirs[:,0],dirs[:,1],dirs[:,2],vals)
-#    mesh = mlab.pipeline.delaunay3d(pts)
-#    surf = mlab.pipeline.surface(mesh, opacity=0.1)
+        vals = np.clip(vals,vmin,vmax)
+    mlab.points3d(dirs[:,0],dirs[:,1],dirs[:,2],np.log(1e-10+vals),scale_mode='none',scale_factor=5.0,opacity=0.2)
+    # pts = mlab.pipeline.scalar_scatter(dirs[:,0],dirs[:,1],dirs[:,2],vals)
+    # mesh = mlab.pipeline.delaunay3d(pts)
+    # surf = mlab.pipeline.surface(mesh, opacity=0.1)
 
 
 def get_env_func(N,resolution,bfactor = None):
-    freq_radius = n.linspace(0,N/2,N/2+1)/(N*resolution)
+    freq_radius = np.linspace(0,N/2,N/2+1)/(N*resolution)
     env = ctf.envelope_function(freq_radius,bfactor)
 
     return freq_radius, env
@@ -777,16 +779,16 @@ def rot_power_spectra(fM,powerLen = None,resolution = None):
         resolution = 1
 
     powerfM = fM.real**2 + fM.imag**2 
-    raps = c.rotational_average(powerfM,powerLen)
-    radius = n.linspace(0,len(raps)-1,len(raps))
+    raps = cryoem.rotational_average(powerfM,powerLen)
+    radius = np.linspace(0,len(raps)-1,len(raps))
 
     return (radius,raps)
 
 def winkeltriple(t,ph):
-    ph1 = n.arccos(2.0/n.pi)
-    a = n.arccos(n.cos(ph)*n.cos(t/2.0))
-    x = 0.5*( t*n.cos(ph1) + 2.0*n.cos(ph)*n.sin(t/2.0) / n.sinc(a/n.pi) )
-    y = 0.5*( ph + n.sin(ph)/n.sinc(a/n.pi) )
+    ph1 = np.arccos(2.0/np.pi)
+    a = np.arccos(np.cos(ph)*np.cos(t/2.0))
+    x = 0.5*( t*np.cos(ph1) + 2.0*np.cos(ph)*np.sin(t/2.0) / np.sinc(a/np.pi) )
+    y = 0.5*( ph + np.sin(ph)/np.sinc(a/np.pi) )
     return x,y
     
 def plotshifts(x,y,v, vmin=None, vmax=None):
@@ -799,14 +801,14 @@ def plotwinkeltriple(d,v, vmin=None, vmax=None):
     v - values
     """
     
-#     phi = n.arctan2(d[:,2],n.linalg.norm(d[:,0:2],axis=1)).reshape((-1,))
-    phi = n.arctan2(d[:,2],n.linalg.norm(d[:,0:2],axis=1)).reshape((-1,))
-    theta = n.arctan2(d[:,1],d[:,0]).reshape((-1,))
+    # phi = np.arctan2(d[:,2],np.linalg.norm(d[:,0:2],axis=1)).reshape((-1,))
+    phi = np.arctan2(d[:,2],np.linalg.norm(d[:,0:2],axis=1)).reshape((-1,))
+    theta = np.arctan2(d[:,1],d[:,0]).reshape((-1,))
 
     x,y = winkeltriple(theta,phi)
     
-    t_border = n.concatenate( [ n.linspace(n.pi,-n.pi,50), n.ones(50)*-n.pi, n.linspace(-n.pi,n.pi,50), n.ones(50)*n.pi ] )
-    ph_border = n.concatenate( [ n.ones(50)*-n.pi/2.0, n.linspace(-n.pi/2,n.pi/2.0,50), n.ones(50)*n.pi/2.0, n.linspace(n.pi/2.0,-n.pi/2.0,50) ] )
+    t_border = np.concatenate( [ np.linspace(np.pi,-np.pi,50), np.ones(50)*-np.pi, np.linspace(-np.pi,np.pi,50), np.ones(50)*np.pi ] )
+    ph_border = np.concatenate( [ np.ones(50)*-np.pi/2.0, np.linspace(-np.pi/2,np.pi/2.0,50), np.ones(50)*np.pi/2.0, np.linspace(np.pi/2.0,-np.pi/2.0,50) ] )
     x_border,y_border = winkeltriple(t_border,ph_border)
 
     plt.hold(True)
@@ -814,4 +816,3 @@ def plotwinkeltriple(d,v, vmin=None, vmax=None):
     plt.plot(x_border,y_border,'-k')
     plt.colorbar()
     plt.show()
-

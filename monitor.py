@@ -1,9 +1,17 @@
-from util import *
-import cPickle, os, shutil, subprocess, shlex, time, platform
-from cryoio import mrc
+from __future__ import print_function, division
+
+import os, shutil, subprocess, shlex, time, platform
+try:
+    import cPickle as pickle  # python 2
+except ImportError:
+    import pickle  # python 3
+
 import numpy as n
 
-default_files = ['model.mrc','dmodel.mrc','diag','stat']
+from util import *
+from cryoio import mrc
+
+default_files = ['model.mrc', 'dmodel.mrc', 'diag', 'stat']
 
 class ExpSetMonitor():
     def __init__(self,exps,base,rbase,lbase,ruserhost,*args,**kwargs):
@@ -51,17 +59,17 @@ class ExpMonitor():
             y = cstat[dset+'_'+yval]
 
         if smooth_window > 1:
-            y = moving_average(n.array(y),smooth_window)
+            y = moving_average(np.array(y),smooth_window)
             
         return x, y
 
     def get_xval(self, xval='num_data', dset='train'):
         if dset is None or dset+'_'+xval not in self.stat:
-            x = n.array(self.stat[xval])
+            x = np.array(self.stat[xval])
         else:
-            x = n.array(self.stat[dset+'_'+xval])
-#        if smooth_window < n.size(x):
-#            lp = smooth(n.array(lp),smooth_window)
+            x = np.array(self.stat[dset+'_'+xval])
+#        if smooth_window < np.size(x):
+#            lp = smooth(np.array(lp),smooth_window)
         if xval=='time':
             x -= x[0]
             x /= 60*60
@@ -71,11 +79,11 @@ class ExpMonitor():
         x = self.get_xval(xval)
         times = self.stat['time']
         x = x[1:]
-        dt = n.diff(times)
+        dt = np.diff(times)
         nd = self.stat['num_data_evals']
-        dnd = n.diff(nd)
+        dnd = np.diff(nd)
         tp = dnd/dt
-        tp = moving_average(n.array(tp), smooth_window)
+        tp = moving_average(np.array(tp), smooth_window)
         return x,tp
     
     def get_like_timing(self, xval='num_data', dset='train'):
@@ -97,12 +105,12 @@ class ExpMonitor():
 
     def get_likestats(self, xval='num_data', dset='train'):
         x = self.get_xval(xval, dset)
-        fullquants = n.vstack(self.stat[dset+'_full_like_quantiles'])
-        miniquants = n.vstack(self.stat[dset+'_mini_like_quantiles'])
+        fullquants = np.vstack(self.stat[dset+'_full_like_quantiles'])
+        miniquants = np.vstack(self.stat[dset+'_mini_like_quantiles'])
         return x, fullquants, miniquants
 
     def get_dataset_size(self):
-        return n.sum(n.array(self.stat['epoch']) == 0)*self.diag['params']['minisize']
+        return np.sum(np.array(self.stat['epoch']) == 0)*self.diag['params']['minisize']
 
     def load_data_files(self):
         try:
@@ -136,7 +144,7 @@ class ExpMonitor():
             return None
 
     def fetch_update(self, force=False):
-        print "Checking for updates to {0}...".format(self.expbase)
+        print("Checking for updates to {0}...".format(self.expbase))
         anyup = False
         for fname in self.files:
             update = checkremotefile(os.path.join(self.rbase,fname), \
@@ -144,11 +152,11 @@ class ExpMonitor():
                                      self.ruserhost)
             anyup = anyup or update
             if update or force:
-                print "  Fetching update of {0}...".format(fname),
-                getremotefile(os.path.join(self.rbase,fname), \
-                              os.path.join(self.lbase,fname), \
-                              self.ruserhost)
-                print "done."
+                print("  Fetching update of {0}...".format(fname),
+                    getremotefile(os.path.join(self.rbase,fname), \
+                                  os.path.join(self.lbase,fname), \
+                                  self.ruserhost))
+                print("done.")
 
         if anyup or force:
             self.load_data_files()
@@ -187,9 +195,9 @@ def getremotefile(remotepath, localpath, remoteuserhost):
 def moving_average(a, winSz):
     if n == 1: return a
     winSz = min(winSz,a.size)
-    ret = n.cumsum(a, dtype=float)
+    ret = np.cumsum(a, dtype=float)
     ret[winSz:] = ret[winSz:] - ret[:-winSz]
-    return n.r_[ret[0:(winSz-1)] / n.arange(1,winSz), ret[(winSz-1):] / winSz]
+    return np.r_[ret[0:(winSz-1)] / np.arange(1,winSz), ret[(winSz-1):] / winSz]
 
 #def smooth(x, window_len=10, window='hanning', boundary='reflect'):
 def smooth(x, window_len=10, window='flat', boundary='zeros'):
@@ -222,33 +230,33 @@ def smooth(x, window_len=10, window='flat', boundary='zeros'):
     scipy.signal.lfilter
     """
 
-    x = n.asarray(x)
+    x = np.asarray(x)
 
     if x.ndim != 1:
-        raise ValueError, "smooth only accepts 1 dimension arrays."
+        raise ValueError("smooth only accepts 1 dimension arrays.")
 
     if window_len < 3:
         return x
 
     if boundary != 'reflect' and x.size < window_len:
-        raise ValueError, "Input vector needs to be bigger than window size."
+        raise ValueError("Input vector needs to be bigger than window size.")
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError, "Window is one of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
+        raise ValueError("Window is one of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
     if not boundary in ['reflect','extend','zeros']:
-        raise ValueError, "boundary is one of 'reflect', 'extend'"
+        raise ValueError("boundary is one of 'reflect', 'extend'")
 
     if boundary == 'reflect':
-        s=n.r_[2*x[0]-x[window_len:1:-1], x, 2*x[-1]-x[-1:-window_len:-1]]
+        s=np.r_[2*x[0]-x[window_len:1:-1], x, 2*x[-1]-x[-1:-window_len:-1]]
     elif boundary == 'extend':
-        s=n.r_[x[0]*n.ones(window_len-1), x, x[-1]*n.ones(window_len-1)]
+        s=np.r_[x[0]*np.ones(window_len-1), x, x[-1]*np.ones(window_len-1)]
     elif boundary == 'zeros':
-        s=n.r_[n.zeros(window_len-1), x, n.ones(window_len-1)]
+        s=np.r_[np.zeros(window_len-1), x, np.ones(window_len-1)]
     
     if window == 'flat': #moving average
-        w = n.ones(window_len,'d')
+        w = np.ones(window_len,'d')
     else:
         w = getattr(n, window)(window_len)
-    y = n.convolve(w/w.sum(), s, mode='same')
+    y = np.convolve(w/w.sum(), s, mode='same')
 
     return y[window_len-1:-window_len+1]
