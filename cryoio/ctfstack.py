@@ -1,7 +1,7 @@
 import numpy as np
 from copy import copy
 
-import ctf
+from . import ctf
 
 
 def readctfstxt(parfile, num=None):

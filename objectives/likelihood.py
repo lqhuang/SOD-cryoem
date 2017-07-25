@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 
-from objective import Objective
+from .objective import Objective
 
 import numpy as np
 
@@ -13,7 +13,7 @@ from cryoio import ctf
 import cryoem, quadrature, density, cryoops
 
 from symmetry import get_symmetryop
-from geom import gencoords
+from geometry import gencoords
 from cryoem import getslices
 
 class UnknownRSLikelihood(Objective):
@@ -24,7 +24,7 @@ class UnknownRSLikelihood(Objective):
         Objective.setup(self,params,diagout,statout,ostream)
 
         if params['kernel'] == 'multicpu':
-            from cpu_kernel import UnknownRSThreadedCPUKernel
+            from .cpu_kernel import UnknownRSThreadedCPUKernel
             self.kernel = UnknownRSThreadedCPUKernel()
         else:
             assert False
@@ -345,7 +345,7 @@ class UnknownRSKernel:
             print("  Projection Ops: %d (%d slice, %d inplane), " % (self.N_RI, self.N_R, self.N_I)); sys.stdout.flush()
             if self.N_RI*symorder < self.otf_thresh_RI:
                 self.using_precomp_slicing = True
-                print("generated in"); sys.stdout.flush()
+                print("generated in", end=''); sys.stdout.flush()
                 self.slice_ops = self.quad_domain_RI.compute_operator(interp_params_RI)
                 print(" {0} secs.".format(time.time() - tic))
 
@@ -432,7 +432,7 @@ class UnknownRSKernel:
             print("  Slice Ops: %d, " % self.N_R); sys.stdout.flush()
             if self.N_R*symorder < self.otf_thresh_R:
                 self.using_precomp_slicing = True
-                print("generated in"); sys.stdout.flush()
+                print("generated in", end=''); sys.stdout.flush()
                 self.slice_ops = self.quad_domain_R.compute_operator(interp_params_R)
                 print(" {0} secs.".format(time.time() - tic))
 
@@ -506,7 +506,7 @@ class UnknownRSKernel:
             print("  Inplane Ops: %d, " % self.N_I); sys.stdout.flush()
             if self.N_I < self.otf_thresh_I:
                 self.using_precomp_inplane = True
-                print("generated in"); sys.stdout.flush()
+                print("generated in", end=''); sys.stdout.flush()
                 self.inplane_ops = self.quad_domain_I.compute_operator(interp_params_I)
                 print(" {0} secs.".format(time.time() - tic))
             else:
@@ -565,7 +565,7 @@ class UnknownRSKernel:
             self.shift_quad = shift_quad
 
         if domain_change or interp_change:
-            print("  Shift Ops: %d, generated in" % self.N_S); sys.stdout.flush()
+            print("  Shift Ops: %d, generated in" % self.N_S, end=''); sys.stdout.flush()
             self.shift_ops = self.quad_domain_S.compute_operator(interp_params)
             print(" {0} secs.".format(time.time() - tic))
             self.shift_interp = interp_params

@@ -10,8 +10,8 @@ import sklearn.preprocessing as prep
 
 from cryoem import relion
 from cryoio import mrc, star
-from geom import geom
-from geom import healpix as hp
+import geometry
+from quadrature import healpix as hp
 
 
 WD = '/Users/lqhuang/Git/SOD-cryoem'
@@ -38,7 +38,7 @@ def gen_euler_angles(num_EAs):
         pt = np.random.randn(3)
         pt /= np.linalg.norm(pt)
         psi = 2 * np.pi * np.random.rand()
-        EA = geom.genEA(pt)[0]
+        EA = geometry.genEA(pt)[0]
         EA[2] = psi
         EAs.append(np.rad2deg(EA))
         # print(EA)

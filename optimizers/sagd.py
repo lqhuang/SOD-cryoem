@@ -3,12 +3,12 @@ from __future__ import print_function, division
 import os
 try:
     import pickle as pickle  # python 3
-except ModuleNotFoundError:
+except ImportError:
     import cPickle as pickle  # python 2
 
 import numpy as np
 
-import base
+from . import base
 from util import FiniteRunningSum
 
 

@@ -3,9 +3,9 @@ from __future__ import print_function, division
 from threading import Lock
 import numpy as np
 
-import mrc
+from . import mrc
 import density
-import geom
+import geometry
 from cryoem import resize_ndarray
 
 
@@ -27,7 +27,7 @@ class ImageStackBase:
 
     def float_images(self, rad=0.99):
         N = self.get_num_pixels()
-        coords = geom.gencoords(N, 2).reshape((N**2, 2))
+        coords = geometry.gencoords(N, 2).reshape((N**2, 2))
         Cs = np.sum(coords**2, axis=1).reshape((N, N)) \
             > (rad * N / 2.0 - 1.5)**2
 
@@ -44,7 +44,7 @@ class ImageStackBase:
 
     def window_images(self, rad=0.99):
         N = self.get_num_pixels()
-        coords = geom.gencoords(N, 2).reshape((N**2, 2))
+        coords = geometry.gencoords(N, 2).reshape((N**2, 2))
         Cs = np.sum(coords**2, axis=1).reshape((N, N)
                                                ) > (rad * N / 2.0 - 1.5)**2
 
@@ -63,7 +63,7 @@ class ImageStackBase:
 
     def estimate_noise_variance(self, esttype='robust', zerosub=False, rad=1.0):
         N = self.get_num_pixels()
-        Cs = np.sum(geom.gencoords(N, 2).reshape((N**2, 2))**2,
+        Cs = np.sum(geometry.gencoords(N, 2).reshape((N**2, 2))**2,
                     axis=1).reshape((N, N)) > (rad * N / 2.0 - 1.5)**2
         vals = []
         for img in self:

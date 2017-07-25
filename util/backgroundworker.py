@@ -50,5 +50,3 @@ the thread to check whether it should quit and whether it is paused.
         self.os("**** Joining Thread ****")
         self.running = False
         self.thread.join()
-
-

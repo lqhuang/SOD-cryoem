@@ -1,12 +1,14 @@
-from fixed import FixedImportanceSampler
 import numpy as np
 import time
 
-import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
-import fisher_util
-
 import scipy.spatial as ss
 import scipy.sparse as sp
+
+from .fixed import FixedImportanceSampler
+
+import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
+from . import fisher_util
+
 
 class FixedFisherImportanceSampler(FixedImportanceSampler):
     def __init__(self,suffix,symmetry=None):

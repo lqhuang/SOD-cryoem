@@ -11,15 +11,15 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(
 import time
 from cryoio import mrc
 from cryoio.ctfstack import CTFStack, GeneratedCTFStack
-import cryoem
+from cryoem import cryoem
 import density
 import cryoops
-import geom
+import geometry
 from util import format_timedelta
 
 try:
     import pickle
-except ModuleNotFoundError:
+except ImportError:
     import cPickle as pickle
 
 import numpy as np
@@ -29,9 +29,14 @@ import sincint
 
 
 def genphantomdata(N_D, phantompath, ctfparfile):
+    # mscope_params = {'akv': 200, 'wgh': 0.07,
+    #                  'cs': 2.0, 'psize': 2.8, 'bfactor': 500.0}
     mscope_params = {'akv': 200, 'wgh': 0.07,
-                     'cs': 2.0, 'psize': 2.8, 'bfactor': 500.0}
-    N = 128
+                     'cs': 2.0, 'psize': 3.0, 'bfactor': 500.0}
+    
+    M = mrc.readMRC(phantompath)
+
+    N = M.shape[0]
     rad = 0.95
     shift_sigma = 3.0
     sigma_noise = 25.0
@@ -60,7 +65,6 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     Cmap = np.sort(np.random.random_integers(
         0, srcctf_stack.get_num_ctfs() - 1, N_D))
 
-    M = mrc.readMRC(phantompath)
     cryoem.window(M, 'circle')
     M[M < 0] = 0
     if M_totalmass is not None:
@@ -94,11 +98,11 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         pt = np.random.randn(3)
         pt /= np.linalg.norm(pt)
         psi = 2 * np.pi * np.random.rand()
-        EA = geom.genEA(pt)[0]
+        EA = geometry.genEA(pt)[0]
         EA[2] = psi
         shift = np.random.randn(2) * shift_sigma
 
-        R = geom.rotmat3D_EA(*EA)[:, 0:2]
+        R = geometry.rotmat3D_EA(*EA)[:, 0:2]
         slop = cryoops.compute_projection_matrix(
             [R], N, kernel, ksize, rad, 'rots')
         S = cryoops.compute_shift_phases(shift.reshape((1, 2)), N, rad)[0]
@@ -128,28 +132,27 @@ if __name__ == '__main__':
 """)
         sys.exit()
 
-    imgdata, ctfstack, pardata, mscope_params = genphantomdata(
-        sys.argv[1], sys.argv[2], sys.argv[3])
+    imgdata, ctfstack, pardata, mscope_params = genphantomdata(sys.argv[1], sys.argv[2], sys.argv[3])
     outpath = sys.argv[4]
     if not os.path.isdir(outpath):
         os.makedirs(outpath)
 
     tic = time.time()
-    print("Dumping data...")
-    sys.stdout.flush()
-    def_path = os.path.join(outpath, 'defocus.txt')
+    print("Dumping data..."); sys.stdout.flush()
+    def_path = os.path.join(outpath,'defocus.txt')
     ctfstack.write_defocus_txt(def_path)
 
-    par_path = os.path.join(outpath, 'ctf_gt.par')
+    par_path = os.path.join(outpath,'ctf_gt.par')
     ctfstack.write_pardata(par_path)
 
-    mrc_path = os.path.join(outpath, 'imgdata.mrc')
-    mrc.writeMRC(mrc_path, np.transpose(
-        imgdata, (1, 2, 0)), mscope_params['psize'])
+    mrc_path = os.path.join(outpath,'imgdata.mrc')
+    print(os.path.realpath(mrc_path))
+    mrc.writeMRC(mrc_path, np.transpose(imgdata,(1,2,0)), mscope_params['psize'])
 
-    pard_path = os.path.join(outpath, 'pardata.pkl')
-    with open(pard_path, 'wb') as fi:
-        pickle.dump(pardatpicklea, fi, protocol=2)
-    print("Done in ", time.time() - tic, " seconds.")
+    pard_path = os.path.join(outpath,'pardata.pkl')
+    print(os.path.realpath(mrc_path))
+    with open(pard_path,'wb') as fi:
+        pickle.dump(pardata, fi, protocol=2)
+    print("Done in ", time.time()-tic, " seconds.")
 
     sys.exit()
