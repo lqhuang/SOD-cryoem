@@ -135,7 +135,7 @@ class UnknownRSLikelihood(Objective):
         return exp_env.reshape((N,N))
         
 
-    def set_samplers(self,sampler_R,sampler_I,sampler_S):
+    def set_samplers(self,sampler_R,sampler_I,sampler_S=None):
         self.kernel.set_samplers(sampler_R,sampler_I,sampler_S)
 
     def set_dataset(self,cryodata):
@@ -217,12 +217,13 @@ class UnknownRSKernel:
         self.sampler_S = None
         
         self.G_datatype = np.complex64
-        
+
 
     def set_samplers(self,sampler_R,sampler_I,sampler_S):
         self.sampler_R = sampler_R
         self.sampler_I = sampler_I
-        self.sampler_S = sampler_S
+        if sampler_S is not None:
+            self.sampler_S = sampler_S
 
     def setup(self,params,diagout,statout,ostream):
         # If there are more than this number of quadrature points, do OTF slicing
@@ -598,7 +599,8 @@ class UnknownRSKernel:
             self.set_inplane_quad(rad)
 
         # Check shift quadrature
-        self.set_shift_quad(rad)
+        if self.sampler_S is not None:
+            self.set_shift_quad(rad)
         
         # Setup inlier model
         self.inlier_sigma2 = cparams['sigma']**2
@@ -663,23 +665,27 @@ class UnknownRSKernel:
         res['like'] = np.zeros(N_M)
         res['N_R_sampled'] = np.zeros(N_M,dtype=np.uint32)
         res['N_I_sampled'] = np.zeros(N_M,dtype=np.uint32)
-        res['N_S_sampled'] = np.zeros(N_M,dtype=np.uint32)
+        if self.sampler_S is not None:
+            res['N_S_sampled'] = np.zeros(N_M,dtype=np.uint32)
         res['N_Total_sampled'] = np.zeros(N_M,dtype=np.uint32)
         
         # Divide by the normalization constant with sigma=noise_std to keep it from being huge
         res['totallike_logscale'] = (self.N**2/2.0)*np.log(2.0*np.pi*basesigma2)
         
-        res['kern_timing'] = {'prep_sample_R':np.empty(N_M),'prep_sample_I':np.empty(N_M),'prep_sample_S':np.empty(N_M),
+        res['kern_timing'] = {'prep_sample_R':np.empty(N_M),'prep_sample_I':np.empty(N_M),
                               'prep_slice':np.empty(N_M), 'prep_rot_img':np.empty(N_M), 'prep_rot_ctf':np.empty(N_M),
                               'prep':np.empty(N_M),'work':np.empty(N_M),'proc':np.empty(N_M),'store':np.empty(N_M)}
+        if self.sampler_S is not None:
+            res['kern_timing']['prep_sample_S'] = np.empty(N_M)
 
         return res
 
     def prep_operators(self,fM,idx, slicing = True, res=None):
         
         Idx = self.minibatch['img_idxs'][idx]
-        CIdx = self.minibatch['ctf_idxs'][idx]
-        cCTF = self.cryodata.ctfstack.get_ctf(CIdx)
+        if self.cryodata.ctfstack is not None:
+            CIdx = self.minibatch['ctf_idxs'][idx]
+            cCTF = self.cryodata.ctfstack.get_ctf(CIdx)
         Img = self.fspace_stack.get_image(Idx)
         
         factoredRI = self.factoredRI
@@ -690,7 +696,8 @@ class UnknownRSKernel:
         else:
             W_R = self.slice_quad['W']
             W_I = self.inplane_quad['W']
-        W_S = self.shift_quad['W']
+            if self.sampler_S is not None:
+                W_S = self.shift_quad['W']
 
         envelope = self.envelope
 
@@ -718,19 +725,20 @@ class UnknownRSKernel:
         if res is not None:
             res['kern_timing']['prep_sample_I'][idx] = time.time() - tic 
 
-        tic = time.time()
-        samples_S, sampleweights_S = self.sampler_S.sample(Idx)
-        if samples_S is None:
-            N_S_sampled = self.N_S
-            S_sampled = self.shift_ops 
-            W_S_sampled = W_S
-        else:
-            N_S_sampled = len(samples_S)
-            S_sampled = self.shift_ops[samples_S]
-            W_S_sampled = np.require( W_S[samples_S] * sampleweights_S , dtype = W_S.dtype)
-        sampleinfo_S = N_S_sampled, samples_S, sampleweights_S
-        if res is not None:
-            res['kern_timing']['prep_sample_S'][idx] = time.time() - tic 
+        if self.sampler_S is not None:
+            tic = time.time()
+            samples_S, sampleweights_S = self.sampler_S.sample(Idx)
+            if samples_S is None:
+                N_S_sampled = self.N_S
+                S_sampled = self.shift_ops 
+                W_S_sampled = W_S
+            else:
+                N_S_sampled = len(samples_S)
+                S_sampled = self.shift_ops[samples_S]
+                W_S_sampled = np.require( W_S[samples_S] * sampleweights_S , dtype = W_S.dtype)
+            sampleinfo_S = N_S_sampled, samples_S, sampleweights_S
+            if res is not None:
+                res['kern_timing']['prep_sample_S'][idx] = time.time() - tic 
 
         if slicing:
             if not factoredRI:
@@ -804,22 +812,28 @@ class UnknownRSKernel:
             rotc_sampled = None
             rotd_sampled = None
 
-        return slice_ops, envelope, \
-            W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
-            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
-            W_S_sampled, sampleinfo_S, S_sampled
+        if self.sampler_S is not None:
+            return slice_ops, envelope, \
+                W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
+                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
+                W_S_sampled, sampleinfo_S, S_sampled
+        else:
+            return slice_ops, envelope, \
+                W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
+                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled
             
     def store_results(self, idx, isw, \
                       cphi_R, sampleinfo_R, \
                       cphi_I, sampleinfo_I, \
-                      cphi_S, sampleinfo_S, res,
-                      logspace_phis = False):
+                      res, logspace_phis = False,
+                      cphi_S = None, sampleinfo_S = None):
         Idx = self.minibatch['img_idxs'][idx]
         testImg = self.minibatch['test_batch']
 
         N_R_sampled = sampleinfo_R[0]
         N_I_sampled = sampleinfo_I[0]
-        N_S_sampled = sampleinfo_S[0]
+        if sampleinfo_S is not None:
+            N_S_sampled = sampleinfo_S[0]
         if not self.factoredRI:
             cphi_R = cphi_R.reshape((N_R_sampled,N_I_sampled))
             if logspace_phis:
@@ -831,23 +845,26 @@ class UnknownRSKernel:
 
         self.sampler_R.record_update(Idx, sampleinfo_R[1], cphi_R, sampleinfo_R[2], isw, testImg, logspace = logspace_phis)
         self.sampler_I.record_update(Idx, sampleinfo_I[1], cphi_I, sampleinfo_I[2], isw, testImg, logspace = logspace_phis)
-        self.sampler_S.record_update(Idx, sampleinfo_S[1], cphi_S, sampleinfo_S[2], isw, testImg, logspace = logspace_phis)
+        if sampleinfo_S:
+            self.sampler_S.record_update(Idx, sampleinfo_S[1], cphi_S, sampleinfo_S[2], isw, testImg, logspace = logspace_phis)
 
         res['N_R_sampled'][idx] = N_R_sampled
         res['N_I_sampled'][idx] = N_I_sampled
-        res['N_S_sampled'][idx] = N_S_sampled
-        res['N_Total_sampled'][idx] = N_R_sampled*N_I_sampled*N_S_sampled
+        if sampleinfo_S is not None:
+            res['N_S_sampled'][idx] = N_S_sampled
+            res['N_Total_sampled'][idx] = N_R_sampled*N_I_sampled*N_S_sampled
+        else:
+            res['N_Total_sampled'][idx] = N_R_sampled * N_I_sampled
         
         res['Evar_prior'][idx] = self.imgpower[idx]/self.N**2
 
         if logspace_phis:
             res['CV2_R'][idx] = np.exp(-logsumexp(2*cphi_R,dtype=np.float64))
             res['CV2_I'][idx] = np.exp(-logsumexp(2*cphi_I,dtype=np.float64))
-            res['CV2_S'][idx] = np.exp(-logsumexp(2*cphi_S,dtype=np.float64))
+            if cphi_S is not None:
+                res['CV2_S'][idx] = np.exp(-logsumexp(2*cphi_S,dtype=np.float64))
         else:
             res['CV2_R'][idx] = (1.0/np.sum(cphi_R**2,dtype=np.float64))
             res['CV2_I'][idx] = (1.0/np.sum(cphi_I**2,dtype=np.float64))
-            res['CV2_S'][idx] = (1.0/np.sum(cphi_S**2,dtype=np.float64))
-
-
-
+            if cphi_S is not None:
+                res['CV2_S'][idx] = (1.0/np.sum(cphi_S**2,dtype=np.float64))

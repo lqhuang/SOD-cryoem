@@ -97,17 +97,24 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
 
             for idx in idxs:
                 tic = time.time()
-                slice_ops, envelope, \
-                W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
-                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
-                W_S_sampled, sampleinfo_S, S_sampled = \
-                    self.prep_operators(fM,idx,res=res)
+                if self.sampler_R is not None:
+                    slice_ops, envelope, \
+                    W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
+                    W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
+                    W_S_sampled, sampleinfo_S, S_sampled = \
+                        self.prep_operators(fM,idx,res=res)
+                else:
+                    slice_ops, envelope, \
+                    W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
+                    W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
+                        self.prep_operators(fM,idx,res=res)
 
                 N_slices = slices_sampled.shape[0]
                 
                 log_W_R = np.log(W_R_sampled)
                 log_W_I = np.log(W_I_sampled)
-                log_W_S = np.log(W_S_sampled)
+                if self.sampler_S is not None:
+                    log_W_S = np.log(W_S_sampled)
 
                 if compute_grad:
                     if g_tmp is None or g_tmp.shape[0] < N_slices or g_tmp.shape[1] != self.N_T:
@@ -121,21 +128,35 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 res['kern_timing']['prep'][idx] = time.time() - tic
 
                 tic = time.time()
-                if len(W_I_sampled) == 1:
-                    like[idx], (cphi_S,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                         objective_kernels.doimage_RS(slices_sampled, \
-                                             S_sampled, envelope, \
-                                             rotc_sampled.reshape((-1,)), rotd_sampled.reshape((-1,)), \
-                                             log_W_S, log_W_R, \
-                                             sigma2, g, workspace )
-                    cphi_I = np.array([0.0])
+                if self.sampler_S is not None:
+                    if len(W_I_sampled) == 1:
+                        like[idx], (cphi_S,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
+                            objective_kernels.doimage_RS(slices_sampled, \
+                                                S_sampled, envelope, \
+                                                rotc_sampled.reshape((-1,)), rotd_sampled.reshape((-1,)), \
+                                                log_W_S, log_W_R, \
+                                                sigma2, g, workspace )
+                        cphi_I = np.array([0.0])
+                    else:
+                        like[idx], (cphi_S,cphi_I,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
+                            objective_kernels.doimage_RIS(slices_sampled, \
+                                                S_sampled, envelope, \
+                                                rotc_sampled, rotd_sampled, \
+                                                log_W_S, log_W_I, log_W_R, \
+                                                sigma2, g, workspace )
                 else:
-                    like[idx], (cphi_S,cphi_I,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                         objective_kernels.doimage_RIS(slices_sampled, \
-                                             S_sampled, envelope, \
-                                             rotc_sampled, rotd_sampled, \
-                                             log_W_S, log_W_I, log_W_R, \
-                                             sigma2, g, workspace )
+                    if len(W_I_sampled) == 1:
+                        like[idx], cphi_R, csigma2_est, ccorrelation, cpower, workspace = \
+                            objective_kernels.doimage_R(slices_sampled, envelope,
+                                rotc_sampled.reshape((-1,)), rotd_sampled.reshape((-1,)), \
+                                log_W_R, sigma2, g, workspace)
+                        cphi_I = np.array([0.0])
+                    else:
+                        like[idx], (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
+                            objective_kernels.doimage_RI(slices_sampled, envelope, \
+                                rotc_sampled, rotd_sampled, \
+                                log_W_I, log_W_R, \
+                                sigma2, g, workspace)
                 res['kern_timing']['work'][idx] = time.time() - tic
 
                 tic = time.time()
@@ -159,11 +180,17 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 res['kern_timing']['proc'][idx] = time.time() - tic
 
                 tic = time.time()
-                self.store_results(idx, 1, \
-                      cphi_R,sampleinfo_R, \
-                      cphi_I,sampleinfo_I, \
-                      cphi_S,sampleinfo_S, res, \
-                      logspace_phis = True)
+                if self.sampler_S is not None:
+                    self.store_results(idx, 1, \
+                          cphi_R,sampleinfo_R, \
+                          cphi_I,sampleinfo_I, \
+                          cphi_S=cphi_S, sampleinfo_S=sampleinfo_S, res=res, \
+                          logspace_phis = True)
+                else:
+                    self.store_results(idx, 1, \
+                        cphi_R,sampleinfo_R, \
+                        cphi_I,sampleinfo_I, \
+                        res = res, logspace_phis = True)
                 res['kern_timing']['store'][idx] = time.time() - tic
 
             if compute_grad:
@@ -222,12 +249,18 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
 
         outputs['N_R'] = self.N_R
         outputs['N_I'] = self.N_I
-        outputs['N_S'] = self.N_S
-        outputs['N_Total'] = self.N_R*self.N_I*self.N_S
+        if self.sampler_S is not None:
+            outputs['N_S'] = self.N_S
+            outputs['N_Total'] = self.N_R*self.N_I*self.N_S
+        else:
+            outputs['N_Total'] = self.N_R * self.N_I
         outputs['N_R_sampled_total'] = float(np.sum(outputs['N_R_sampled']))/self.N_R
         outputs['N_I_sampled_total'] = float(np.sum(outputs['N_I_sampled']))/self.N_I
-        outputs['N_S_sampled_total'] = float(np.sum(outputs['N_S_sampled']))/self.N_S
-        outputs['N_Total_sampled_total'] = float(np.sum(outputs['N_Total_sampled']))/(self.N_R*self.N_I*self.N_S)
+        if self.sampler_S is not None:
+            outputs['N_S_sampled_total'] = float(np.sum(outputs['N_S_sampled']))/self.N_S
+            outputs['N_Total_sampled_total'] = float(np.sum(outputs['N_Total_sampled']))/(self.N_R*self.N_I*self.N_S)
+        else:
+            outputs['N_Total_sampled_total'] = float(np.sum(outputs['N_Total_sampled']))/(self.N_R * self.N_I)
 
         L = outputs['like'].sum(dtype=np.float64)/N_M
         outputs['L'] = L

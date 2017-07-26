@@ -622,7 +622,10 @@ class Visualizer(ExpMonitor):
         if len(glbl_phi_R) == 1:
             glbl_phi_R = None
         glbl_phi_I = cdiag['global_phi_I']
-        glbl_phi_S = cdiag['global_phi_S']
+        if 'global_phi_S' in cdiag:
+            glbl_phi_S = cdiag['global_phi_S']
+        else:
+            glbl_phi_S = None
 
         # Get direction quadrature
         quad_R = quadrature.quad_schemes[('dir',cparams.get('quad_type_R','sk97'))]
@@ -633,23 +636,27 @@ class Visualizer(ExpMonitor):
             quad_degree_R,_ = quad_R.compute_degree(N,rad,usFactor_R)
         origlebDirs,_ = quad_R.get_quad_points(quad_degree_R,quad_sym)
         lebDirs = np.dot(origlebDirs,R)
+        vmax_R = 5.0/len(glbl_phi_R)
 
         # Get shift quadrature
-        quad_S = quadrature.quad_schemes[('shift',cparams.get('quad_type_S','hermite'))]
-        quad_degree_S = cparams.get('quad_degree_S','auto')
-        if quad_degree_S == 'auto':
-            usFactor_S = cparams.get('quad_undersample_S',
-                                     cparams.get('quad_undersample',1.0))
-            quad_degree_S = quad_S.get_degree(N,rad,
-                                              cparams['quad_shiftsigma']/resolution,
-                                              cparams['quad_shiftextent']/resolution,
-                                              usFactor_S)
-        pts_S,_ = quad_S.get_quad_points(quad_degree_S,
-                                         cparams['quad_shiftsigma']/resolution,
-                                         cparams['quad_shiftextent']/resolution,
-                                         cparams.get('quad_shifttrunc','circ'))
-        vmax_R = 5.0/len(glbl_phi_R)
-        vmax_S = 5.0/len(glbl_phi_S)
+        if 'global_phi_S' in cdiag:
+            quad_S = quadrature.quad_schemes[('shift',cparams.get('quad_type_S','hermite'))]
+            quad_degree_S = cparams.get('quad_degree_S','auto')
+            if quad_degree_S == 'auto':
+                usFactor_S = cparams.get('quad_undersample_S',
+                                        cparams.get('quad_undersample',1.0))
+                quad_degree_S = quad_S.get_degree(N,rad,
+                                                cparams['quad_shiftsigma']/resolution,
+                                                cparams['quad_shiftextent']/resolution,
+                                                usFactor_S)
+            pts_S,_ = quad_S.get_quad_points(quad_degree_S,
+                                            cparams['quad_shiftsigma']/resolution,
+                                            cparams['quad_shiftextent']/resolution,
+                                            cparams.get('quad_shifttrunc','circ'))
+            vmax_S = 5.0/len(glbl_phi_S)
+        else:
+            pts_S = np.zeros_like([0])
+            vmax_S = None
 
         # Density visualization
         mlab.figure(self.fig1)

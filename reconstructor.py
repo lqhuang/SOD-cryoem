@@ -217,7 +217,11 @@ class CryoOptimizer(BackgroundWorker):
         
         self.ostream('  {0} Batch:'.format(name))
 
-        for suff in ['R','I','S']:
+        if 'CV2_S' in res:
+            keymap = ['R', 'I', 'S']
+        else:
+            keymap = ['R', 'I']
+        for suff in keymap:
             diag[prefix+'_CV2_'+suff] = res['CV2_'+suff]
 
         diag[prefix+'_idxs'] = batch['img_idxs']
@@ -228,12 +232,20 @@ class CryoOptimizer(BackgroundWorker):
         # self.ostream("    RMS Error: %g" % (sigma/n.sqrt(self.cryodata.noise_var)))
         self.ostream("    RMS Error: %g, Signal: %g" % (sigma/np.sqrt(self.cryodata.noise_var), \
                                                         sigma_prior/np.sqrt(self.cryodata.noise_var)))
-        self.ostream("    Effective # of R / I / S:     %.2f / %.2f / %.2f " %\
+        if 'CV2_S' in res:
+            self.ostream("    Effective # of R / I / S:     %.2f / %.2f / %.2f " %\
                       (np.mean(res['CV2_R']), np.mean(res['CV2_I']),np.mean(res['CV2_S'])))
+        else:
+            self.ostream("    Effective # of R / I :     %.2f / %.2f " % \
+                        (np.mean(res['CV2_R']), np.mean(res['CV2_I'])))
 
         # Importance Sampling Statistics
         is_speedups = []
-        for suff in ['R','I','S','Total']:
+        if 'CV2_S' in res:
+            keymap = ['R', 'I', 'S', 'Total']
+        else:
+            keymap = ['R','I','Total']
+        for suff in keymap:
             if self.cparams.get('is_on_'+suff,False) or (suff == 'Total' and len(is_speedups) > 0):
                 spdup = N_M/res['N_' + suff + '_sampled_total']
                 is_speedups.append((suff,spdup,np.mean(res['N_'+suff+'_sampled']),res['N_'+suff]))
@@ -509,7 +521,8 @@ class CryoOptimizer(BackgroundWorker):
         self.is_sym = get_symmetryop(self.cparams.get('is_symmetry',self.cparams.get('symmetry',None)))
         self.sampler_R = FixedFisherImportanceSampler('_R',self.is_sym)
         self.sampler_I = FixedFisherImportanceSampler('_I')
-        self.sampler_S = FixedGaussianImportanceSampler('_S')
+        # self.sampler_S = FixedGaussianImportanceSampler('_S')
+        self.sampler_S = None
         self.like_func.set_samplers(sampler_R=self.sampler_R,sampler_I=self.sampler_I,sampler_S=self.sampler_S)
 
     def eval_params(self):
@@ -709,11 +722,13 @@ class CryoOptimizer(BackgroundWorker):
         tic_isupdate = time.time()
         self.sampler_R.perform_update()
         self.sampler_I.perform_update()
-        self.sampler_S.perform_update()
+        if self.sampler_S is not None:
+            self.sampler_S.perform_update()
 
         self.diagout.output(global_phi_R=self.sampler_R.get_global_dist())
         self.diagout.output(global_phi_I=self.sampler_I.get_global_dist())
-        self.diagout.output(global_phi_S=self.sampler_S.get_global_dist())
+        if self.sampler_S is not None:
+            self.diagout.output(global_phi_S=self.sampler_S.get_global_dist())
         timing['is_update'] = time.time() - tic_isupdate
 
         # Output basic diagnostics
