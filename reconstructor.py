@@ -324,7 +324,7 @@ class CryoOptimizer(BackgroundWorker):
         self.io_thread.start()
 
         # General setup ----------------------------------------------------
-        self.expbase = expbase
+        self.expbase = os.path.join(expbase, 'logs')
         self.outbase = None
 
         # Paramter setup ---------------------------------------------------
