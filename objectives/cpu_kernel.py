@@ -6,7 +6,7 @@ from threading import Thread, Lock
 import time, multiprocessing
 try:
     from Queue import Queue  # python 2
-except ImportError:
+except ModuleNotFoundError:
     from queue import Queue  # python 3
 
 import numpy as np

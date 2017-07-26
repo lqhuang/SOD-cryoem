@@ -132,14 +132,14 @@ class ExpMonitor():
                 return mrc.readMRC(os.path.join(self.lbase,fname))
             else:
                 with open(os.path.join(self.lbase,fname), 'rb') as f:
-                    return cPickle.load(f)[-1][key]
+                    return pickle.load(f)[-1][key]
         else:
             return None
 
     def loadfile(self, fname):
         if os.path.isfile(os.path.join(self.lbase,fname)):
             with open(os.path.join(self.lbase,fname), 'rb') as f:
-                return cPickle.load(f)
+                return pickle.load(f)
         else:
             return None
 
