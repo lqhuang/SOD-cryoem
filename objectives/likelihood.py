@@ -645,7 +645,11 @@ class UnknownRSKernel:
 
         res = { }
 
-        for suff in ['S','I','R']:
+        if self.sampler_S is not None:
+            keymap = ['R', 'I', 'S']
+        else:
+            keymap = ['R', 'I']
+        for suff in keymap:
             res['CV2_'+suff] = np.zeros(N_M)
 
         basesigma2 = self.cryodata.noise_var
@@ -845,7 +849,7 @@ class UnknownRSKernel:
 
         self.sampler_R.record_update(Idx, sampleinfo_R[1], cphi_R, sampleinfo_R[2], isw, testImg, logspace = logspace_phis)
         self.sampler_I.record_update(Idx, sampleinfo_I[1], cphi_I, sampleinfo_I[2], isw, testImg, logspace = logspace_phis)
-        if sampleinfo_S:
+        if sampleinfo_S is not None:
             self.sampler_S.record_update(Idx, sampleinfo_S[1], cphi_S, sampleinfo_S[2], isw, testImg, logspace = logspace_phis)
 
         res['N_R_sampled'][idx] = N_R_sampled
@@ -855,7 +859,7 @@ class UnknownRSKernel:
             res['N_Total_sampled'][idx] = N_R_sampled*N_I_sampled*N_S_sampled
         else:
             res['N_Total_sampled'][idx] = N_R_sampled * N_I_sampled
-        
+
         res['Evar_prior'][idx] = self.imgpower[idx]/self.N**2
 
         if logspace_phis:

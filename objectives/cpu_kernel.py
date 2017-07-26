@@ -97,7 +97,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
 
             for idx in idxs:
                 tic = time.time()
-                if self.sampler_R is not None:
+                if self.sampler_S is not None:
                     slice_ops, envelope, \
                     W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
                     W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
