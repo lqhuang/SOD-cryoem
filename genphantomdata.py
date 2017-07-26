@@ -18,9 +18,9 @@ import geometry
 from util import format_timedelta
 
 try:
-    import pickle
+    import cPickle as pickle  # python 2
 except ImportError:
-    import cPickle as pickle
+    import pickle  # python 3
 
 import numpy as np
 import pyximport; pyximport.install(

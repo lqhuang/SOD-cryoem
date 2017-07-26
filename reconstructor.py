@@ -23,7 +23,7 @@ import socket
 from threading import Thread
 try:
     from Queue import Queue  # python 2
-except ImportError:
+except ModuleNotFoundError:
     from queue import Queue  # python 3
 
 from optimizers.sagd import SAGDStep
