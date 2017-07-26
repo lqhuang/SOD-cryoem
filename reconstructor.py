@@ -474,6 +474,13 @@ class CryoOptimizer(BackgroundWorker):
         if ((modelscale*self.cryodata.N - np.abs(mleDC)) / mleDC_est_std) > 3:
             print("  WARNING: the selected modelscale value is more than 3 std devs different than the estimated one.  Be sure this is correct.")
 
+        # save initial model
+        tic = time.time()
+        print("Saving initial model..."); sys.stdout.flush()
+        init_model_fname = os.path.join(self.expbase, 'init_model.mrc')
+        writeMRC(init_model_fname, M, psz=self.cparams['pixel_size'])
+        print("done in {0:.2f}s".format(time.time() - tic))
+
         self.M = np.require(M,dtype=density.real_t)
         self.fM = density.real_to_fspace(M)
         self.dM = density.zeros_like(self.M)
