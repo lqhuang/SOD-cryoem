@@ -3,9 +3,9 @@ from __future__ import print_function, division
 import sys
 
 try:
-    import pickle as pickle
+    import cPickle as pickle  # python 2
 except ImportError:
-    import cPickle as pickle
+    import pickle as pickle  # python 3
 
 
 class OutputStream():

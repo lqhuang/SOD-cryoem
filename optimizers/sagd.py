@@ -2,9 +2,9 @@ from __future__ import print_function, division
 
 import os
 try:
-    import pickle as pickle  # python 3
-except ImportError:
     import cPickle as pickle  # python 2
+except ImportError:
+    import pickle as pickle  # python 3
 
 import numpy as np
 

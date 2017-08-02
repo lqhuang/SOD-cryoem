@@ -6,7 +6,7 @@ try:
 except ImportError:
     import pickle  # python 3
 
-import numpy as n
+import numpy as np
 
 from util import *
 from cryoio import mrc
@@ -32,11 +32,11 @@ class ExpMonitor():
         self.expbase = expbase
 
         if ruserhost == None:
-            self.lbase = os.path.join(lbase, expbase)
+            self.lbase = os.path.join(lbase, expbase, 'logs')
         else:
             self.lbase = os.path.join(lbase, ruserhost, expbase)
 
-        self.rbase = os.path.join(rbase, expbase)
+        self.rbase = os.path.join(rbase, expbase, 'logs')
         self.ruserhost = ruserhost
 
         if not os.path.isdir(self.lbase):
@@ -132,14 +132,14 @@ class ExpMonitor():
                 return mrc.readMRC(os.path.join(self.lbase,fname))
             else:
                 with open(os.path.join(self.lbase,fname), 'rb') as f:
-                    return cPickle.load(f)[-1][key]
+                    return pickle.load(f)[-1][key]
         else:
             return None
 
     def loadfile(self, fname):
         if os.path.isfile(os.path.join(self.lbase,fname)):
             with open(os.path.join(self.lbase,fname), 'rb') as f:
-                return cPickle.load(f)
+                return pickle.load(f)
         else:
             return None
 

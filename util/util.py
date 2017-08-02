@@ -1,13 +1,13 @@
 import shlex
 import subprocess
-import sklearn.preprocessing as prep
+# import sklearn.preprocessing as prep
 
 
-def standard_scale(X_train, X_test):
-    preprocessor = prep.StandardScaler().fit(X_train)
-    X_train = preprocessor.transform(X_train)
-    X_test = preprocessor.transform(X_test)
-    return X_train, X_test
+# def standard_scale(X_train, X_test):
+#     preprocessor = prep.StandardScaler().fit(X_train)
+#     X_train = preprocessor.transform(X_train)
+#     X_test = preprocessor.transform(X_test)
+#     return X_train, X_test
 
 
 def run_system_command(command_string):
@@ -16,19 +16,3 @@ def run_system_command(command_string):
                                stdout=subprocess.PIPE)  # Run system command
     output, _ = process.communicate()  # Get the log.
     return output.decode('utf-8')  # return the log file
-
-
-def memoize(f):
-    """ Memoization decorator for functions taking one or more arguments. """
-    class memodict(dict):
-        def __init__(self, f):
-            self.f = f
-
-        def __call__(self, *args):
-            return self[args]
-
-        def __missing__(self, key):
-            ret = self.f(*key)
-            self[key] = ret
-            return ret
-    return memodict(f)

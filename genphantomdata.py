@@ -11,16 +11,16 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(
 import time
 from cryoio import mrc
 from cryoio.ctfstack import CTFStack, GeneratedCTFStack
-from cryoem import cryoem
+import cryoem
 import density
 import cryoops
 import geometry
 from util import format_timedelta
 
 try:
-    import pickle
+    import cPickle as pickle  # python 2
 except ImportError:
-    import cPickle as pickle
+    import pickle  # python 3
 
 import numpy as np
 import pyximport; pyximport.install(
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     mrc.writeMRC(mrc_path, np.transpose(imgdata,(1,2,0)), mscope_params['psize'])
 
     pard_path = os.path.join(outpath,'pardata.pkl')
-    print(os.path.realpath(mrc_path))
+    print(os.path.realpath(par_path))
     with open(pard_path,'wb') as fi:
         pickle.dump(pardata, fi, protocol=2)
     print("Done in ", time.time()-tic, " seconds.")
