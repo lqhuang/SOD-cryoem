@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 from __future__ import print_function, division
 
 # First, and before importing any Enthought packages, set the ETS_TOOLKIT
@@ -29,13 +30,13 @@ from cryoio import mrc
 import cryoem
 from visualizer import plot_density
 
+import numpy as np
 
-# The mrc visualization
+
 class MrcVisualization(HasTraits):
-    level = Range(0, 100, 20) #mode='spinner')
-
+    # FIXME: adjust contour level of density map
+    level = Range(0, 100, 20)  # mode='spinner'
     scene = Instance(MlabSceneModel, ())
-
     density_plot = Instance(PipelineBase)
 
     # the layout of the dialog screated
@@ -123,7 +124,14 @@ class MRCVisualizerQWidget(QtGui.QWidget):
 
         Ms = [mrc.readMRC(mrcfile) for mrcfile in mrcfiles]
 
-        layout = QtGui.QHBoxLayout(self)
+        
+        if len(mrcfiles) < 6:
+            hbox = True
+            layout = QtGui.QHBoxLayout(self)
+        else:
+            hbox = False
+            layout = QtGui.QGridLayout(self)
+            maxcol = int(len(mrcfiles) / 3) + 1
         layout.setContentsMargins(0,0,0,0)
         layout.setSpacing(0)
 
@@ -131,7 +139,11 @@ class MRCVisualizerQWidget(QtGui.QWidget):
             filename = os.path.basename(mrcfiles[i])
 
             self.splitter_main_bottom = QtGui.QSplitter(self)
-            layout.addWidget(self.splitter_main_bottom)
+            if hbox:
+                layout.addWidget(self.splitter_main_bottom)
+            else:
+                row, col = np.unravel_index(i, (3, maxcol))
+                layout.addWidget(self.splitter_main_bottom, row, col)
 
             self.splitter_main_bottom.setOrientation(QtCore.Qt.Horizontal)
             # self.sliceplot_widget = SlicePlotQWidget()
