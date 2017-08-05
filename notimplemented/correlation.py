@@ -1,34 +1,64 @@
 from __future__ import print_function, division
 
+import os
+import sys
+sys.path.append(os.path.dirname(sys.path[0]))
+
 import numpy as np
 from scipy import interpolate
 
+import geometry
+import density
 
-def cart2pol(x, y):
+
+def cart2pol(*coords):
     """Convert cartesian coordinates to polar coordinates.
-    x, y = pol2cart(theta, rho)"""
-    rho = np.sqrt(x**2 + y**2)
-    theta = np.arctan2(y, x)
-    return theta, rho
+    rho, theta = cart2pol(x, y)"""
+    if len(coords) == 1:
+        cart = coords[0]
+        assert cart.shape[1] == 2
+        rho = np.sqrt(np.sum(cart ** 2, 1))
+        theta = np.arctan(cart[:, 1] / cart[:, 0])
+        return np.vstack((rho, theta)).T
+    elif len(coords) == 2:
+        x, y = coords
+        assert x.shape == y.shape
+        rho = np.sqrt(x**2 + y**2)
+        theta = np.arctan2(y, x)
+        return rho, theta
+    else:
+        raise ValueError('inappropriate arguments')
 
-def pol2cart(theta, rho):
+
+def pol2cart(*coords):
     """Convert polar coordinates to cartesian coordinates.
-    x, y = pol2cart(theta, rho)"""
-    x = rho * np.cos(theta)
-    y = rho * np.sin(theta)
-    return x, y
+    x, y = pol2cart(rho, theta)"""
+    if len(coords) == 1:
+        pol = coords[0]
+        assert pol.shape[1] == 2
+        x = pol[:, 1] * np.cos(pol[:, 0])
+        y = pol[:, 1] * np.sin(pol[:, 0])
+        return np.vstack((x, y)).T
+    elif len(coords) == 2:
+        rho, theta = coords
+        assert rho.shape == theta.shape
+        x = rho * np.cos(theta)
+        y = rho * np.sin(theta)
+        return x, y
+    else:
+        raise ValueError('inappropriate arguments')
 
+
+# Image center:
+# The center of rotation of a 2D image of dimensions xdim x ydim is defined by 
+# ((int)xdim/2, (int)(ydim/2)) (with the first pixel in the upper left being (0,0).
+# Note that for both xdim=ydim=65 and for xdim=ydim=64, the center will be at (32,32).
+# This is the same convention as used in SPIDER and XMIPP. Origin offsets reported 
+# for individual images translate the image to its center and are to be applied 
+# BEFORE rotations.
 def imgpolarcoord(img):
     """
     Convert a given image from cartesian coordinates to polar coordinates.
-
-    Image center:
-    The center of rotation of a 2D image of dimensions xdim x ydim is defined by 
-    ((int)xdim/2, (int)(ydim/2)) (with the first pixel in the upper left being (0,0).
-    Note that for both xdim=ydim=65 and for xdim=ydim=64, the center will be at (32,32).
-    This is the same convention as used in SPIDER and XMIPP. Origin offsets reported 
-    for individual images translate the image to its center and are to be applied 
-    BEFORE rotations.
     """
     row, col = img.shape
     cx = int(col/2)
@@ -48,23 +78,15 @@ def imgpolarcoord(img):
         i = i + 1
     return pcimg
 
+
 def imgpolarcoord3(img):
     """
     converts a given image from cartesian coordinates to polar coordinates.
-
-    Image center:
-    The center of rotation of a 2D image of dimensions xdim x ydim is defined by 
-    ((int)xdim/2, (int)(ydim/2)) (with the first pixel in the upper left being (0,0).
-    Note that for both xdim=ydim=65 and for xdim=ydim=64, the center will be at (32,32).
-    This is the same convention as used in SPIDER and XMIPP. Origin offsets reported 
-    for individual images translate the image to its center and are to be applied 
-    BEFORE rotations.
     """
     row, col = img.shape
     cx = int(col/2)
     cy = int(row/2)
     radius = float(min([row-cy, col-cx, cx, cy]))
-    print(radius)
     angle = 360.0
     # Interpolation: Linear (undone)
     x_range = np.arange(-radius+1, radius, 1)
@@ -74,10 +96,10 @@ def imgpolarcoord3(img):
     # f = interpolate.RectBivariateSpline(x_range, y_range, img[1:int(cy+radius),1:int(cx+radius)])
     f = interpolate.interp2d(x_range, y_range, z, kind='linear')
 
-    theta_range = np.arange(0, 2*np.pi, 2*np.pi/angle)
     rho_range = np.arange(0, radius, 1)
-    theta_grid, rho_grid = np.meshgrid(theta_range, rho_range)
-    new_x_grid, new_y_grid = pol2cart(theta_grid, rho_grid)
+    theta_range = np.arange(0, 2*np.pi, 2*np.pi/angle)
+    rho_grid, theta_grid = np.meshgrid(rho_range, theta_range)
+    new_x_grid, new_y_grid = pol2cart(rho_grid, theta_grid)
 
     plt.figure(3)
     plt.imshow(new_x_grid)
@@ -91,7 +113,8 @@ def imgpolarcoord3(img):
     print(pcimg.shape)
     return pcimg
 
-def get_corr_img(img, pcimg_interpolation='nearest'):
+
+def calc_corr_img(img, pcimg_interpolation='nearest'):
     """
     get a angular correlation image
     """
@@ -102,18 +125,28 @@ def get_corr_img(img, pcimg_interpolation='nearest'):
 
     pcimg_fourier = np.fft.fftshift(np.fft.fft(pcimg, axis=1))
     corr_img = np.fft.ifft(np.fft.ifftshift(pcimg_fourier*np.conjugate(pcimg_fourier)), axis=1)
-    return corr_img.real
+    return np.require(corr_img.real, dtype=density.real_t)
+
+
+def get_corr_imgs(imgs, pcimg_interpolation='nearest'):
+    num_imgs = imgs.shape[0]
+    N = imgs.shape[1]
+    corr_imgs = np.zeros((num_imgs, int(N/2), 360), dtype=density.real_t)
+    for i, img in enumerate(imgs):
+        corr_imgs[i, :, :] = get_corr_img(img)
+
+    return corr_imgs
 
 
 if __name__ == '__main__':
     from cryoio import mrc
     from matplotlib import pyplot as plt
-    map_file = '../particle/EMD-2325.map'
+    map_file = '../particle/1AON.mrc'
     model = mrc.readMRC(map_file)
-    proj1 = np.sum(model, axis=2)
-    corr_img = get_corr_img(proj1, pcimg_interpolation='linear')
+    proj = np.sum(model, axis=2)
+    c2_img = calc_corr_img(proj1, pcimg_interpolation='linear')
     plt.figure(1)
-    plt.imshow(proj1)
+    plt.imshow(proj)
     # plt.figure(2)
     # plt.imshow(c2_img)
     plt.show()
