@@ -18,7 +18,7 @@ def cart2pol(*coords):
         cart = coords[0]
         assert cart.shape[1] == 2
         rho = np.sqrt(np.sum(cart ** 2, 1))
-        theta = np.arctan(cart[:, 1] / cart[:, 0])
+        theta = np.arctan2(cart[:, 1], cart[:, 0])
         return np.vstack((rho, theta)).T
     elif len(coords) == 2:
         x, y = coords
@@ -133,9 +133,68 @@ def get_corr_imgs(imgs, pcimg_interpolation='nearest'):
     N = imgs.shape[1]
     corr_imgs = np.zeros((num_imgs, int(N/2), 360), dtype=density.real_t)
     for i, img in enumerate(imgs):
-        corr_imgs[i, :, :] = get_corr_img(img)
+        corr_imgs[i, :, :] = calc_corr_img(img)
 
     return corr_imgs
+
+
+def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest', sort_theta=False):
+    """compute angular correlation for input array"""
+    # 1. get a input (single: N_T or multi: N_R x N_T) with normal sequence.
+    # 2. sort truncation array by rho value of polar coordinates
+    # 3. apply angular correlation function to sorted slice for both real part and imaginary part
+    # 4. return angluar correlation slice with normal sequence (need to do this?).
+
+    # 1.
+    iscomplex = np.iscomplexobj(trunc_slices)
+    _, trunc_xy, _ = geometry.gencoords(N, 2, rad, True)
+    if trunc_slices.ndim < 2:
+        assert trunc_xy.shape[0] == trunc_slices.shape[0]
+    else:
+        assert trunc_xy.shape[0] == trunc_slices.shape[1]
+
+    # 2.
+    pol_trunc_xy = cart2pol(trunc_xy)
+    if sort_theta:
+        # lexsort; first, sort rho; second, sort theta
+        sorted_idx = np.lexsort((pol_trunc_xy[:, 1], pol_trunc_xy[:, 0]))
+    else:
+        sorted_idx = np.argsort(pol_trunc_xy[:, 0])
+    axis = trunc_slices.ndim - 1
+    sorted_rho = np.take(pol_trunc_xy[:, 0], sorted_idx)
+    sorted_slice = np.take(trunc_slices, sorted_idx, axis=axis)
+
+    # 3.
+    if 'none' in interpolation:
+        pass
+    elif 'nearest' in interpolation:
+        sorted_rho = np.round(sorted_rho)
+    elif 'linear' in interpolation:
+        raise NotImplementedError()
+    else:
+        raise ValueError('unsupported method for interpolation')
+
+    _, unique_idx, unique_counts = np.unique(sorted_rho, return_index=True, return_counts=True)
+    indices = [slice(None)] * trunc_slices.ndim
+    angular_correlation = np.zeros_like(trunc_slices, dtype=trunc_slices.dtype)
+    for i, count in enumerate(unique_counts):
+        indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
+        if count < 2:
+            angular_correlation[indices]  = np.copy(sorted_slice[indices])
+        else:
+            # use view (slicing) or copy (fancy indexing, np.take(), np.put())?
+            same_rho = np.copy(sorted_slice[indices])
+            fpcimg_real = density.real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
+            angular_correlation[indices].real = density.fspace_to_real(
+                fpcimg_real * fpcimg_real.conjugate(), axes=(axis,))
+            if iscomplex:  # FIXME: stupid way. optimize this
+                fpcimg_fourier = density.real_to_fspace(same_rho.imag, axes=(axis,))  # polar image in fourier sapce
+                angular_correlation[indices].imag = density.fspace_to_real(
+                    fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,))
+
+    # 4. 
+    corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)
+    return corr_trunc_slices
 
 
 if __name__ == '__main__':
@@ -144,7 +203,7 @@ if __name__ == '__main__':
     map_file = '../particle/1AON.mrc'
     model = mrc.readMRC(map_file)
     proj = np.sum(model, axis=2)
-    c2_img = calc_corr_img(proj1, pcimg_interpolation='linear')
+    c2_img = calc_corr_img(proj, pcimg_interpolation='linear')
     plt.figure(1)
     plt.imshow(proj)
     # plt.figure(2)
