@@ -18,20 +18,21 @@ import sincint
 
 def full_to_trunc(full_samples, rad):
     """convert samples in full shape to samples in truncation"""
+    dtype = full_samples.dtype
     if full_samples.ndim == 3:
         num_samples = full_samples.shape[0]
         N = full_samples.shape[1]
     elif full_samples.ndim == 2:
         N = full_samples.shape[0]
+        num_samples = 1
         full_samples = (full_samples,)
     
-    num_samples = full_samples.shape[0]
     FtoT = sincint.genfulltotrunc(N=N, rad=rad)
-    N_T = FtoT.shape[1]
+    N_T = FtoT.shape[0]
     
-    trunc_samples = np.zeros((num_samples, N_T), dtype=full_samples.dtype)
+    trunc_samples = np.zeros((num_samples, N_T), dtype=dtype)
     for i, sample in enumerate(full_samples):
-        trunc_samples[i, :] = FtoT.dot(sample)
+        trunc_samples[i, :] = FtoT.dot(sample.flatten())
 
     return trunc_samples
 
@@ -40,14 +41,15 @@ def trunc_to_full(trunc_samples, N, rad):
     num_samples = trunc_samples.shape[0]
     TtoF = sincint.gentrunctofull(N=N, rad=rad)
     
-    if num_samples == 1:
-        full_samples = (full_samples,)
-
     full_samples = np.zeros((num_samples, N, N), dtype=trunc_samples.dtype)
     for i, sample in enumerate(trunc_samples):
         full_samples[i] = TtoF.dot(sample).reshape((N,N))
 
+    if num_samples == 1:
+        full_samples = full_samples.reshape((N, N))
+
     return full_samples
+
 
 def project(model, *euler_angles, rad=0.95, truncate=False):
 

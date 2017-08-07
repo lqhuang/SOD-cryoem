@@ -114,7 +114,7 @@ def imgpolarcoord3(img):
     return pcimg
 
 
-def calc_corr_img(img, pcimg_interpolation='nearest'):
+def get_corr_img(img, pcimg_interpolation='nearest'):
     """
     get a angular correlation image
     """
@@ -131,9 +131,10 @@ def calc_corr_img(img, pcimg_interpolation='nearest'):
 def get_corr_imgs(imgs, pcimg_interpolation='nearest'):
     num_imgs = imgs.shape[0]
     N = imgs.shape[1]
-    corr_imgs = np.zeros((num_imgs, int(N/2), 360), dtype=density.real_t)
+    assert N == imgs.shape[2]
+    corr_imgs = np.zeros((num_imgs, int(N/2.0), 360), dtype=density.real_t)
     for i, img in enumerate(imgs):
-        corr_imgs[i, :, :] = calc_corr_img(img)
+        corr_imgs[i, :, :] = get_corr_img(img)
 
     return corr_imgs
 
@@ -203,7 +204,7 @@ if __name__ == '__main__':
     map_file = '../particle/1AON.mrc'
     model = mrc.readMRC(map_file)
     proj = np.sum(model, axis=2)
-    c2_img = calc_corr_img(proj, pcimg_interpolation='linear')
+    c2_img = get_corr_img(proj, pcimg_interpolation='linear')
     plt.figure(1)
     plt.imshow(proj)
     # plt.figure(2)
