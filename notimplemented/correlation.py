@@ -56,14 +56,14 @@ def pol2cart(*coords):
 # This is the same convention as used in SPIDER and XMIPP. Origin offsets reported 
 # for individual images translate the image to its center and are to be applied 
 # BEFORE rotations.
-def imgpolarcoord(img):
+def imgpolarcoord(img, rad=1.0):
     """
     Convert a given image from cartesian coordinates to polar coordinates.
     """
     row, col = img.shape
     cx = int(col/2)
     cy = int(row/2)
-    radius = float(min([row-cy, col-cx, cx, cy]))
+    radius = int(min([row-cy, col-cx, cx, cy]) * rad)
     angle = 360.0
     # Interpolation: Nearest
     pcimg = np.zeros((int(radius), int(angle)))
@@ -79,14 +79,14 @@ def imgpolarcoord(img):
     return pcimg
 
 
-def imgpolarcoord3(img):
+def imgpolarcoord3(img, rad=1.0):
     """
     converts a given image from cartesian coordinates to polar coordinates.
     """
     row, col = img.shape
     cx = int(col/2)
     cy = int(row/2)
-    radius = float(min([row-cy, col-cx, cx, cy]))
+    radius = float(min([row-cy, col-cx, cx, cy])) * rad
     angle = 360.0
     # Interpolation: Linear (undone)
     x_range = np.arange(-radius+1, radius, 1)
@@ -114,27 +114,27 @@ def imgpolarcoord3(img):
     return pcimg
 
 
-def get_corr_img(img, pcimg_interpolation='nearest'):
+def get_corr_img(img, rad=1.0, pcimg_interpolation='nearest'):
     """
     get a angular correlation image
     """
     if 'nearest' in pcimg_interpolation.lower():
-        pcimg = imgpolarcoord(img)
+        pcimg = imgpolarcoord(img, rad=rad)
     elif 'linear' in pcimg_interpolation.lower():
-        pcimg = imgpolarcoord3(img)
+        pcimg = imgpolarcoord3(img, rad=rad)
 
     pcimg_fourier = np.fft.fftshift(np.fft.fft(pcimg, axis=1))
     corr_img = np.fft.ifft(np.fft.ifftshift(pcimg_fourier*np.conjugate(pcimg_fourier)), axis=1)
     return np.require(corr_img.real, dtype=density.real_t)
 
 
-def get_corr_imgs(imgs, pcimg_interpolation='nearest'):
+def get_corr_imgs(imgs, rad=1.0, pcimg_interpolation='nearest'):
     num_imgs = imgs.shape[0]
     N = imgs.shape[1]
     assert N == imgs.shape[2]
     corr_imgs = np.zeros((num_imgs, int(N/2.0), 360), dtype=density.real_t)
     for i, img in enumerate(imgs):
-        corr_imgs[i, :, :] = get_corr_img(img)
+        corr_imgs[i, :, :] = get_corr_img(img, rad=rad, pcimg_interpolation=pcimg_interpolation)
 
     return corr_imgs
 
