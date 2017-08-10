@@ -1,37 +1,61 @@
+#!/usr/bin/env python
 from __future__ import print_function, division
 
 import os
+import sys
+sys.path.append(os.path.dirname(sys.path[0]))
 import pickle
 import argparse
-from random import randint 
+from random import randint
+
 from matplotlib import pyplot as plt
+from numpy import unravel_index
 
 from cryoio import mrc
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_imgs', type=str)
-    parser.add_argument('-r', '--random', type=bool, default=False)
+def plot_projs(mrcs_files):
+    plot_randomly = True
 
-    args = parser.parse_args()
-    input_imgs = os.path.abspath(args.input_imgs)
-    plot_randomly = args.random
-    print(plot_randomly)
-    image_stack = mrc.readMRCimgs(input_imgs, 0)
-    size = image_stack.shape
-    print('image size: {0}x{1}, number of images: {2}'.format(*size))
-    plt.figure(1)
-    for i in range(9):
-        plt.subplot(331+i)
-        if plot_randomly:
-            num = randint(0, size[2])
-        else:
-            num = i
-        print(num)
-        plt.imshow(image_stack[:, :, num])
+    for mrcs in mrcs_files:
+        image_stack = mrc.readMRCimgs(mrcs, 0)
+        size = image_stack.shape
+        N = size[0]
+        print('image size: {0}x{1}, number of images: {2}'.format(*size))
+        print('Select indices randomly:', plot_randomly)
+        fig, axes = plt.subplots(3, 3)
+        for i, ax in enumerate(axes.flat):
+            row, col = unravel_index(i, (3, 3))
+            if plot_randomly:
+                num = randint(0, size[2])
+            else:
+                num = i
+            print('index:', num)
+            img = image_stack[:, :, num]
+            im = ax.imshow(img, cmap='Greys', origin='lower')
+            if row == 2:
+                ax.set_xticks([0, int(N/4.0), int(N/2.0), int(N*3.0/4.0), int(N-1)])
+            else:
+                ax.set_xticks([])
+            if col == 0:
+                ax.set_yticks([0, int(N/4.0), int(N/2.0), int(N*3.0/4.0), int(N-1)])
+            else:
+                ax.set_yticks([])
+
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
+        fig.suptitle('{} before normalization'.format(mrcs))
+
     plt.show()
 
 
 if __name__ == '__main__':
-    main()
+
+    print(sys.argv)
+    if len(sys.argv) >= 2:
+        mrcs_files = sys.argv[1:]
+    else:
+        assert False, 'Need mrc file as argument'
+
+    plot_projs(mrcs_files)
