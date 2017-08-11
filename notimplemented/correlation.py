@@ -36,8 +36,8 @@ def pol2cart(*coords):
     if len(coords) == 1:
         pol = coords[0]
         assert pol.shape[1] == 2
-        x = pol[:, 1] * np.cos(pol[:, 0])
-        y = pol[:, 1] * np.sin(pol[:, 0])
+        x = pol[:, 0] * np.cos(pol[:, 1])
+        y = pol[:, 0] * np.sin(pol[:, 1])
         return np.vstack((x, y)).T
     elif len(coords) == 2:
         rho, theta = coords
