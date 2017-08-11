@@ -75,11 +75,11 @@ def compute_shift_phases(pts, N, rad):
 
 def compute_premultiplier(N, kernel, kernsize, scale=512):
     krange = int(N / 2)
-    koffset = int((N / 2) * scale)
+    koffset = int(N / 2) * scale
 
     x = np.arange(-scale * krange, scale * krange) / float(scale)
     if kernel == 'lanczos':
-        a = kernsize / 2
+        a = kernsize / 2.0
         k = np.sinc(x) * np.sinc(x / a) * (np.abs(x) <= a)
     elif kernel == 'sinc':
         a = kernsize / 2.0

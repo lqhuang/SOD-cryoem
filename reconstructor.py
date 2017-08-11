@@ -59,8 +59,8 @@ def density2params(M,fM,xtype,grad_transform = False,precond = None):
         assert precond is None, 'Unimplemented'
 
         N = fM.shape[0]
-        NC = N/2 + 1
-        startFreq = 1-(N%2)
+        NC = int(N/2) + 1
+        startFreq = int(1-(N%2))
 
         herm_freqs = fM[0:NC,:,:]
         if startFreq:
@@ -104,9 +104,9 @@ def param2density(x,xtype,sz,precond = None):
         M, fM = None, density.empty_cplx(sz)
 
         N = sz[0]
-        NC = N/2 + 1
-        startFreq = 1-(N%2)
-        zeroFreq = N/2
+        NC = int(N/2) + 1
+        startFreq = int(1-(N%2))
+        zeroFreq = int(N/2)
 
         herm_freqs = np.empty((NC,N,N),dtype=density.complex_t)
         herm_freqs.real = x[0:NC*N**2].reshape(herm_freqs.shape)

@@ -35,10 +35,10 @@ def rotate_density(M, R, t=None, upsamp=1.0):
     coords = gencoords(Nup, 3).reshape((Nup**3, 3)) / float(upsamp)
     if t is None:
         interp_coords = np.transpose(np.dot(coords, R.T)).reshape(
-            (3, Nup, Nup, Nup)) + N / 2
+            (3, Nup, Nup, Nup)) + int(N / 2)
     else:
         interp_coords = np.transpose(
-            np.dot(coords, R.T) + t).reshape((3, Nup, Nup, Nup)) + N / 2
+            np.dot(coords, R.T) + t).reshape((3, Nup, Nup, Nup)) + int(N / 2)
     out = spinterp.map_coordinates(M, interp_coords, order=1)
 
     return out

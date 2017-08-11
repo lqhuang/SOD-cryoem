@@ -1,6 +1,8 @@
 # This code is copyright Marcus A. Brubaker and Ali Punjani, 2015.
 # https://github.com/mbrubake/cryoem-cvpr2015
-# This code has been formated and modified
+# This code has been formated and modified by Lanqing Huang
+from __future__ import print_function, division
+
 import numpy as np
 from util import memoize
 
@@ -125,7 +127,10 @@ def genEA(vec):
 
 @memoize
 def gencoords_base(N, d):
-    x = np.arange(-N/2,N/2,dtype=np.float32)
+    if N % 2 == 0:
+        x = np.arange(int(-N/2.0), int(N/2.0), dtype=np.float32)
+    else:
+        x = np.arange(int(-N/2.0), int(N/2.0)+1, dtype=np.float32)
     c = x.copy()
     for i in range(1,d):
         c = np.column_stack([np.repeat(c, N, axis=0), np.tile(x, N**i)])
