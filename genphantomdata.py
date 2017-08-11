@@ -29,11 +29,11 @@ import sincint
 
 
 def genphantomdata(N_D, phantompath, ctfparfile):
-    # mscope_params = {'akv': 200, 'wgh': 0.07,
-    #                  'cs': 2.0, 'psize': 2.8, 'bfactor': 500.0}
     mscope_params = {'akv': 200, 'wgh': 0.07,
-                     'cs': 2.0, 'psize': 3.0, 'bfactor': 500.0}
-    
+                     'cs': 2.0, 'psize': 2.8, 'bfactor': 500.0}
+    # mscope_params = {'akv': 200, 'wgh': 0.07,
+    #                  'cs': 2.0, 'psize': 3.0, 'bfactor': 500.0}
+
     M = mrc.readMRC(phantompath)
 
     N = M.shape[0]
@@ -100,7 +100,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         psi = 2 * np.pi * np.random.rand()
         EA = geometry.genEA(pt)[0]
         EA[2] = psi
-        shift = np.random.randn(2) * shift_sigma
+        shift = np.random.randn(2) * 0
 
         R = geometry.rotmat3D_EA(*EA)[:, 0:2]
         slop = cryoops.compute_projection_matrix(
