@@ -441,7 +441,6 @@ def vis_fourier_space_comparison(imgs, corr_imgs,
 
 
 def realspace_benchmark(model, ea=None, num_inplane_angles=360, calc_corr_img=False):
-
     N = model.shape[0]
     ea, euler_angles = gen_EAs_randomly(ea, num_inplane_angles)
 
@@ -457,7 +456,6 @@ def realspace_benchmark(model, ea=None, num_inplane_angles=360, calc_corr_img=Fa
 
 
 def realspace_benchmark_new_algorithm(model, ea=None, num_inplane_angles=360, rad=0.6, calc_corr_img=False):
-
     N = model.shape[0]
     ea, euler_angles = gen_EAs_randomly(ea, num_inplane_angles)
 
@@ -486,7 +484,6 @@ def realspace_benchmark_new_algorithm(model, ea=None, num_inplane_angles=360, ra
 
 def realspace_benchmark_comparison(model, ea=None, num_inplane_angles=360,
                                    save_animation=False, animation_name=None):
-
     N = model.shape[0]
     ea, euler_angles = gen_EAs_randomly(ea, num_inplane_angles)
 
@@ -505,7 +502,6 @@ def realspace_benchmark_comparison(model, ea=None, num_inplane_angles=360,
 
 def realspace_benchmark_new_algorithm_comparison(model, ea=None, num_inplane_angles=360, rad=0.6,
                                                  save_animation=False, animation_name=None):
-
     N = model.shape[0]
     ea, euler_angles = gen_EAs_randomly(ea, num_inplane_angles)
 
@@ -538,7 +534,6 @@ def realspace_benchmark_new_algorithm_comparison(model, ea=None, num_inplane_ang
 
 def fourierspace_benchmark_comparison(model, ea=None, num_inplane_angles=360, modulus=False,
                                       save_animation=False, animation_name=None):
-
     N = model.shape[0]
     ea, euler_angles = gen_EAs_randomly(ea, num_inplane_angles)
 
@@ -631,7 +626,6 @@ def fourierspace_benchmark_new_algorithm_comparison(model, ea=None, num_inplane_
 
 
 def speed_benchmark_comparison(model):
-    
     if isinstance(model, np.ndarray):
         N = model.shape[0]
 
@@ -671,7 +665,6 @@ def speed_benchmark_comparison(model):
 
 
 def angular_correlation_visulize(model, ea=None, rad=0.8):
-
     N = model.shape[0]
     ea0 = [0, 0, 0]
     ea1 = [0, 0, 60]
@@ -707,7 +700,6 @@ def angular_correlation_visulize(model, ea=None, rad=0.8):
 
 
 if __name__ == '__main__':
-
     print(sys.argv)
     mrc_file = sys.argv[1]
     M = mrc.readMRC(mrc_file)

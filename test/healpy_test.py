@@ -31,9 +31,7 @@ def calculate_nside_resolution():
 
 
 if __name__ == '__main__':
-
     calculate_nside_resolution()
-
     # generate random distribution of Euler angles
     v = np.random.randn(100,3)
     v = v  / np.linalg.norm(v, axis=1).repeat(3).reshape(-1,3)
