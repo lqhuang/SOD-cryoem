@@ -17,7 +17,10 @@ import cryoem
 from objectives import eval_objective, SumObjectives
 from importancesampler.gaussian import FixedGaussianImportanceSampler
 from importancesampler.fisher import FixedFisherImportanceSampler
-import pickle
+try:
+    import cPickle as pickle  # python 2
+except ImportError:
+    import pickle  # python 3
 import socket
 
 from threading import Thread
