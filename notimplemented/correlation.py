@@ -6,6 +6,8 @@ sys.path.append(os.path.dirname(sys.path[0]))
 
 import numpy as np
 from scipy import interpolate
+from scipy.ndimage import interpolation as spinterp
+from scipy.stats import threshold
 
 import geometry
 import density
@@ -88,29 +90,13 @@ def imgpolarcoord3(img, rad=1.0):
     cy = int(row/2)
     radius = float(min([row-cy, col-cx, cx, cy])) * rad
     angle = 360.0
-    # Interpolation: Linear (undone)
-    x_range = np.arange(-radius+1, radius, 1)
-    y_range = np.arange(-radius+1, radius, 1)
-    z = img[1:int(cy+radius),1:int(cx+radius)]
-    # f = interpolate.interp2d(x_range, y_range, img[1:int(cy+radius),1:int(cx+radius)], kind='linear')
-    # f = interpolate.RectBivariateSpline(x_range, y_range, img[1:int(cy+radius),1:int(cx+radius)])
-    f = interpolate.interp2d(x_range, y_range, z, kind='linear')
-
+    # Interpolation: Linear
     rho_range = np.arange(0, radius, 1)
     theta_range = np.arange(0, 2*np.pi, 2*np.pi/angle)
-    rho_grid, theta_grid = np.meshgrid(rho_range, theta_range)
+    theta_grid, rho_grid = np.meshgrid(theta_range, rho_range)
     new_x_grid, new_y_grid = pol2cart(rho_grid, theta_grid)
 
-    plt.figure(3)
-    plt.imshow(new_x_grid)
-    plt.figure(4)
-    plt.imshow(new_y_grid)
-    plt.show()
-
-    # pcimg = f(new_x_grid.ravel(), new_y_grid.ravel())
-    # pcimg = pcimg.reshape((int(radius+1),-1))
-    pcimg = np.zeros((int(radius), int(angle)))
-    print(pcimg.shape)
+    pcimg = spinterp.map_coordinates(img, (new_x_grid + radius, new_y_grid + radius))
     return pcimg
 
 
@@ -139,20 +125,65 @@ def get_corr_imgs(imgs, rad=1.0, pcimg_interpolation='nearest'):
     return corr_imgs
 
 
-def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest', sort_theta=False):
+def gen_pol_coords(N, rad, interpolation='nearest', sort_theta=True):
+    trunc_xy = geometry.gencoords(N, 2, rad)
+    pol_trunc_xy = cart2pol(trunc_xy)
+    if sort_theta:
+        # lexsort; first, sort rho; second, sort theta
+        sorted_idx = np.lexsort((pol_trunc_xy[:, 1], pol_trunc_xy[:, 0]))
+    else:
+        sorted_idx = np.argsort(pol_trunc_xy[:, 0])
+    sorted_rho = np.take(pol_trunc_xy[:, 0], sorted_idx)
+    unique_rho, unique_idx, unique_counts = np.unique(sorted_rho, return_index=True, return_counts=True)
+
+    return unique_idx
+
+
+def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
+    """ generate coordinates of all points in an NxN..xN grid with d dimensions 
+    coords in each dimension are [-N/2, N/2) 
+    N should be even"""
+    if not truncmask:
+        _, truncc, _ = gencoords_outside(N, d, rad, True)
+        return truncc
+    
+    c = geometry.gencoords_base(N, d)
+
+    if rad is not None:
+        if trunctype == 'circ':
+            r2 = np.sum(c**2, axis=1)
+            trunkmask = r2 > (rad*N/2.0)**2
+        elif trunctype == 'square':
+            r = np.max(np.abs(c), axis=1)
+            trunkmask = r > (rad*N/2.0)
+            
+        truncc = c[trunkmask, :]
+    else:
+        trunkmask = np.ones((c.shape[0],), dtype=np.bool8)
+        truncc = c
+ 
+    return c, truncc, trunkmask
+
+
+def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
+                             sort_theta=False, clip=True, outside=False):
     """compute angular correlation for input array"""
     # 1. get a input (single: N_T or multi: N_R x N_T) with normal sequence.
     # 2. sort truncation array by rho value of polar coordinates
     # 3. apply angular correlation function to sorted slice for both real part and imaginary part
-    # 4. return angluar correlation slice with normal sequence (need to do this?).
+    # 4. return angluar correlation slice with normal sequence.
+    # 5. deal with outlier beyond 3 sigma (no enough points to do sampling via fft)
 
     # 1.
     iscomplex = np.iscomplexobj(trunc_slices)
-    _, trunc_xy, _ = geometry.gencoords(N, 2, rad, True)
-    if trunc_slices.ndim < 2:
-        assert trunc_xy.shape[0] == trunc_slices.shape[0]
+    if outside:
+        trunc_xy = gencoords_outside(N, 2, rad)
     else:
-        assert trunc_xy.shape[0] == trunc_slices.shape[1]
+        trunc_xy = geometry.gencoords(N, 2, rad)
+    if trunc_slices.ndim < 2:
+        assert trunc_xy.shape[0] == trunc_slices.shape[0], "wrong length of trunc slice or wrong radius"
+    else:
+        assert trunc_xy.shape[0] == trunc_slices.shape[1], "wrong length of trunc slice or wrong radius"
 
     # 2.
     pol_trunc_xy = cart2pol(trunc_xy)
@@ -195,7 +226,42 @@ def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest', sort
 
     # 4. 
     corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)
-    return corr_trunc_slices
+
+    # 5. oversampling is unavailable, hence dropout points beyond 3 sigma
+    if clip:
+        factor = 3
+        mean = corr_trunc_slices.mean(axis)
+        std = corr_trunc_slices.std(axis)
+        vmin = mean - std * factor 
+        vmax = mean + std * factor
+        # clipped_corr_trunc_slices = np.clip(corr_trunc_slices.T, vmin, vmax).T  # set outlier to nearby boundary
+        clipped_corr_trunc_slices = threshold(corr_trunc_slices.T, vmin, vmax, 0).T  # set outlier to 0
+        return clipped_corr_trunc_slices
+    else:
+        return corr_trunc_slices
+
+
+def calc_full_ac(image, rad, outside=True, **ac_kwargs):    
+    import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
+    import sincint
+
+    assert image.ndim == 2, "wrong dimension"
+    assert image.shape[0] == image.shape[1]
+
+    N = image.shape[0]
+    FtoT = sincint.genfulltotrunc(N, rad)
+    TtoF = FtoT.T
+    trunc = FtoT.dot(image.flatten())
+    corr_trunc = calc_angular_correlation(trunc, N, rad, **ac_kwargs)
+    full_angular_correlation = TtoF.dot(corr_trunc)
+    
+    if outside:
+        _, _, outside_mask = gencoords_outside(N, 2, rad, True)
+        corr_trunc_outside = calc_angular_correlation(image[outside_mask.reshape(N, N)].flatten(),
+                                                    N, rad, outside=True, **ac_kwargs)
+        full_angular_correlation[outside_mask] = corr_trunc_outside
+
+    return full_angular_correlation.reshape(N, N)
 
 
 if __name__ == '__main__':
@@ -204,9 +270,10 @@ if __name__ == '__main__':
     map_file = '../particle/1AON.mrc'
     model = mrc.readMRC(map_file)
     proj = np.sum(model, axis=2)
-    c2_img = get_corr_img(proj, pcimg_interpolation='linear')
+    c2_img_nearest = get_corr_img(proj, pcimg_interpolation='nearest')
+    c2_img_linear = get_corr_img(proj, pcimg_interpolation='linear')
     plt.figure(1)
     plt.imshow(proj)
-    # plt.figure(2)
-    # plt.imshow(c2_img)
+    plt.figure(2)
+    plt.imshow(c2_img_linear)
     plt.show()
