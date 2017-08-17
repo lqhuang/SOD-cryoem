@@ -125,20 +125,6 @@ def get_corr_imgs(imgs, rad=1.0, pcimg_interpolation='nearest'):
     return corr_imgs
 
 
-def gen_pol_coords(N, rad, interpolation='nearest', sort_theta=True):
-    trunc_xy = geometry.gencoords(N, 2, rad)
-    pol_trunc_xy = cart2pol(trunc_xy)
-    if sort_theta:
-        # lexsort; first, sort rho; second, sort theta
-        sorted_idx = np.lexsort((pol_trunc_xy[:, 1], pol_trunc_xy[:, 0]))
-    else:
-        sorted_idx = np.argsort(pol_trunc_xy[:, 0])
-    sorted_rho = np.take(pol_trunc_xy[:, 0], sorted_idx)
-    unique_rho, unique_idx, unique_counts = np.unique(sorted_rho, return_index=True, return_counts=True)
-
-    return unique_idx
-
-
 def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
     """ generate coordinates of all points in an NxN..xN grid with d dimensions 
     coords in each dimension are [-N/2, N/2) 
@@ -166,13 +152,19 @@ def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
 
 
 def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
-                             sort_theta=False, clip=True, outside=False):
-    """compute angular correlation for input array"""
+                             sort_theta=True, clip=True, outside=False,):
+    """compute angular correlation for input array
+    outside: True or False (default: False)
+        calculate angular correlation in radius or outside of radius
+    sort_theta: True or False (default: True)
+        sort theta when slicing the same rho in trunc array
+    """
     # 1. get a input (single: N_T or multi: N_R x N_T) with normal sequence.
     # 2. sort truncation array by rho value of polar coordinates
     # 3. apply angular correlation function to sorted slice for both real part and imaginary part
-    # 4. return angluar correlation slice with normal sequence.
-    # 5. deal with outlier beyond 3 sigma (no enough points to do sampling via fft)
+    # 4. deal with outlier beyond 3 sigma (no enough points to do sampling via fft)
+    #    (oversampling is unavailable, hence dropout points beyond 3 sigma)
+    # 5. return angluar correlation slice with normal sequence.
 
     # 1.
     iscomplex = np.iscomplexobj(trunc_slices)
@@ -224,21 +216,24 @@ def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
                 angular_correlation[indices].imag = density.fspace_to_real(
                     fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,))
 
-    # 4. 
-    corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)
-
-    # 5. oversampling is unavailable, hence dropout points beyond 3 sigma
+    # 4.
     if clip:
         factor = 3
-        mean = corr_trunc_slices.mean(axis)
-        std = corr_trunc_slices.std(axis)
-        vmin = mean - std * factor 
-        vmax = mean + std * factor
-        # clipped_corr_trunc_slices = np.clip(corr_trunc_slices.T, vmin, vmax).T  # set outlier to nearby boundary
-        clipped_corr_trunc_slices = threshold(corr_trunc_slices.T, vmin, vmax, 0).T  # set outlier to 0
-        return clipped_corr_trunc_slices
-    else:
-        return corr_trunc_slices
+        for i, count in enumerate(unique_counts):
+            indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
+            if count < 10:
+                pass
+            else:
+                mean = angular_correlation[indices].mean(axis)
+                std = angular_correlation[indices].std(axis)
+                vmin = mean - std * factor
+                vmax = mean + std * factor
+                # angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
+                angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
+
+    # 5.
+    corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)
+    return corr_trunc_slices
 
 
 def calc_full_ac(image, rad, outside=True, **ac_kwargs):    
