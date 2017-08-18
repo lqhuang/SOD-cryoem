@@ -9,3 +9,5 @@ stat
 gitinfo
 like*
 mstep
+*.png
+*.txt
