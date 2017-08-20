@@ -12,6 +12,12 @@ from scipy.stats import threshold
 import geometry
 import density
 
+fftmod = np.fft
+USINGFFTW = False
+fft_threads = None
+real_t = np.float32
+complex_t = np.complex64
+
 
 def cart2pol(*coords):
     """Convert cartesian coordinates to polar coordinates.
@@ -49,6 +55,56 @@ def pol2cart(*coords):
         return x, y
     else:
         raise ValueError('inappropriate arguments')
+
+
+def real_to_fspace(M, axes=None, threads=None):
+    """ Convert real-space M to (unitary) Fourier space """
+    if USINGFFTW:
+        if threads is None:
+            threads = fft_threads
+        ret = np.require(np.fft.fftshift(fftmod.fftn(np.fft.fftshift(M, axes=axes),
+                                                     axes=axes, threads=threads),
+                                         axes=axes),
+                         dtype=complex_t)
+    else:
+        ret = np.require(np.fft.fftshift(fftmod.fftn(np.fft.fftshift(M, axes=axes),
+                                                     axes=axes),
+                                         axes=axes),
+                         dtype=complex_t)
+        ret = np.require(np.fft.fftshift(fftmod.fftn(np.fft.fftshift(M))),
+                         dtype=complex_t)
+    # nrm is the scaling factor needed to make an unnormalized FFT a
+    # unitary transform
+    if axes is None:
+        nrm = 1.0 / np.sqrt(np.prod(M.shape))
+    else:
+        nrm = 1.0 / np.sqrt(np.prod(np.array(M.shape)[np.array(axes)]))
+    ret *= nrm
+    return ret
+
+
+def fspace_to_real(fM, axes=None, threads=None):
+    """ Convert unitary Fourier space fM to real space """
+    if USINGFFTW:
+        if threads is None:
+            threads = fft_threads
+        ret = np.require(np.fft.ifftshift(fftmod.ifftn(np.fft.ifftshift(fM, axes=axes),
+                                                       axes=axes, threads=threads),
+                                          axes=axes).real,
+                         dtype=real_t)
+    else:
+        ret = np.require(np.fft.ifftshift(fftmod.ifftn(np.fft.ifftshift(fM, axes=axes),
+                                                       axes=axes),
+                                          axes=axes).real,
+                         dtype=real_t)
+    # nrm is the scaling factor needed to make an unnormalized FFT a
+    # unitary transform
+    if axes is None:
+        nrm = np.sqrt(np.prod(fM.shape))
+    else:
+        nrm = np.sqrt(np.prod(np.array(fM.shape)[np.array(axes)]))
+    ret *= nrm
+    return ret
 
 
 # Image center:
@@ -208,13 +264,13 @@ def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
         else:
             # use view (slicing) or copy (fancy indexing, np.take(), np.put())?
             same_rho = np.copy(sorted_slice[indices])
-            fpcimg_real = density.real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
-            angular_correlation[indices].real = density.fspace_to_real(
-                fpcimg_real * fpcimg_real.conjugate(), axes=(axis,))
+            fpcimg_real = real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
+            angular_correlation[indices].real = fspace_to_real(
+                fpcimg_real * fpcimg_real.conjugate(), axes=(axis,)).real
             if iscomplex:  # FIXME: stupid way. optimize this
-                fpcimg_fourier = density.real_to_fspace(same_rho.imag, axes=(axis,))  # polar image in fourier sapce
-                angular_correlation[indices].imag = density.fspace_to_real(
-                    fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,))
+                fpcimg_fourier = real_to_fspace(same_rho.imag, axes=(axis,))  # polar image in fourier sapce
+                angular_correlation[indices].imag = fspace_to_real(
+                    fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,)).real
 
     # 4.
     if clip:
