@@ -127,6 +127,13 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                     g = None
                 res['kern_timing']['prep'][idx] = time.time() - tic
 
+                # get angular correlation slices
+                tic = time.time()
+                ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
+                    slices_sampled, rotd_sampled, rotc_sampled, envelope)
+                use_angular_correlation = False
+                res['calc_angular_correlation'].append(time.time() - tic)
+
                 tic = time.time()
                 if self.sampler_S is not None:
                     if len(W_I_sampled) == 1:
@@ -145,18 +152,27 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                                                 log_W_S, log_W_I, log_W_R, \
                                                 sigma2, g, workspace )
                 else:
-                    if len(W_I_sampled) == 1:
-                        like[idx], cphi_R, csigma2_est, ccorrelation, cpower, workspace = \
-                            objective_kernels.doimage_R(slices_sampled, envelope,
-                                rotc_sampled.reshape((-1,)), rotd_sampled.reshape((-1,)), \
-                                log_W_R, sigma2, g, workspace)
-                        cphi_I = np.array([0.0])
-                    else:
+                    if use_angular_correlation:
                         like[idx], (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                            objective_kernels.doimage_RI(slices_sampled, envelope, \
+                            objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                                 rotc_sampled, rotd_sampled, \
+                                ac_slices_sampled, ac_data_sampled, \
                                 log_W_I, log_W_R, \
                                 sigma2, g, workspace)
+                        if np.random.randn() > 2: print("using angular correlation")
+                    else:
+                        if len(W_I_sampled) == 1:
+                            like[idx], cphi_R, csigma2_est, ccorrelation, cpower, workspace = \
+                                objective_kernels.doimage_R(slices_sampled, envelope,
+                                    rotc_sampled.reshape((-1,)), rotd_sampled.reshape((-1,)), \
+                                    log_W_R, sigma2, g, workspace)
+                            cphi_I = np.array([0.0])
+                        else:
+                            like[idx], (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
+                                objective_kernels.doimage_RI(slices_sampled, envelope, \
+                                    rotc_sampled, rotd_sampled, \
+                                    log_W_I, log_W_R, \
+                                    sigma2, g, workspace)
                 res['kern_timing']['work'][idx] = time.time() - tic
 
                 tic = time.time()

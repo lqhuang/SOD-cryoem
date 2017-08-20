@@ -16,6 +16,9 @@ from symmetry import get_symmetryop
 from geometry import gencoords
 from cryoem import getslices
 
+from notimplemented import correlation
+
+
 class UnknownRSLikelihood(Objective):
     def __init__(self):
         Objective.__init__(self,False)
@@ -654,6 +657,8 @@ class UnknownRSKernel:
 
         basesigma2 = self.cryodata.noise_var
 
+        res['calc_angular_correlation'] = list()
+
         res['Evar_like'] = np.zeros(N_M)
         res['Evar_prior']= np.zeros(N_M)
         # res['Evar_prior'] = self.cryodata.data['imgpower'][self.minibatch['I']]/self.N**2
@@ -872,3 +877,17 @@ class UnknownRSKernel:
             res['CV2_I'][idx] = (1.0/np.sum(cphi_I**2,dtype=np.float64))
             if cphi_S is not None:
                 res['CV2_S'][idx] = (1.0/np.sum(cphi_S**2,dtype=np.float64))
+
+    def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope):
+        N_R, N_T = slices_sampled.shape
+        assert rotd_sampled[0].shape == rotc_sampled[0].shape
+        assert rotd_sampled[0].shape[0] == N_T
+
+        if envelope is not None:
+            assert envelope.shape[0] == slices_sampled.shape[1], "wrong length for envelope"
+            slices_sampled = np.tile(envelope, (N_R, 1)) * slices_sampled
+        
+        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad)
+        ac_data = correlation.calc_angular_correlation(rotc_sampled[0] * rotd_sampled[0], self.N, self.rad)
+        
+        return ac_slices, ac_data
