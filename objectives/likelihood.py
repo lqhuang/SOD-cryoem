@@ -657,8 +657,6 @@ class UnknownRSKernel:
 
         basesigma2 = self.cryodata.noise_var
 
-        res['calc_angular_correlation'] = list()
-
         res['Evar_like'] = np.zeros(N_M)
         res['Evar_prior']= np.zeros(N_M)
         # res['Evar_prior'] = self.cryodata.data['imgpower'][self.minibatch['I']]/self.N**2
@@ -686,6 +684,8 @@ class UnknownRSKernel:
                               'prep':np.empty(N_M),'work':np.empty(N_M),'proc':np.empty(N_M),'store':np.empty(N_M)}
         if self.sampler_S is not None:
             res['kern_timing']['prep_sample_S'] = np.empty(N_M)
+
+        res['angular_correlation_timing'] = 0
 
         return res
 

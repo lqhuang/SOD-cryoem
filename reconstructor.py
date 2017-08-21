@@ -277,6 +277,9 @@ class CryoOptimizer(BackgroundWorker):
 
         for k,v in res['like_timing'].items():
             stat[prefix+'_like_timing_'+k] = [v]
+        for k,v in res['kern_timing'].items():
+            stat[prefix+'_kern_timing_'+k] = [v]
+        stat[prefix+'_angular_correlation_timing'] = [res['angular_correlation_timing']]
         
         Idxs = batch['img_idxs']
         self.img_likes[Idxs] = res['like']
