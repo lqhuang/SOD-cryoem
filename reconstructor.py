@@ -277,7 +277,9 @@ class CryoOptimizer(BackgroundWorker):
 
         for k,v in res['like_timing'].items():
             stat[prefix+'_like_timing_'+k] = [v]
-        
+        for k,v in res['kern_timing'].items():
+            stat[prefix+'_kern_timing_'+k] = [v]
+
         Idxs = batch['img_idxs']
         self.img_likes[Idxs] = res['like']
         like['img_likes'] = self.img_likes
@@ -798,6 +800,8 @@ class CryoOptimizer(BackgroundWorker):
         time_total = time.time() - tic_mini
         self.ostream("  Minibatch Total - %.2f seconds                         Total Runtime - %s" %
                      (time_total, format_timedelta(datetime.now() - self.startdatetime) ))
+        
+        self.statout.output(time_total=[time_total])
 
         return self.iteration < self.cparams.get('max_iterations',np.inf) and \
                cepoch < self.cparams.get('max_epochs',np.inf)
