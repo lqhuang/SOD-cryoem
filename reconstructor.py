@@ -801,7 +801,7 @@ class CryoOptimizer(BackgroundWorker):
         self.ostream("  Minibatch Total - %.2f seconds                         Total Runtime - %s" %
                      (time_total, format_timedelta(datetime.now() - self.startdatetime) ))
         
-        self.statout.output(time_total=[time_total])
+        self.statout.output(minibatch_time=[time_total])
 
         return self.iteration < self.cparams.get('max_iterations',np.inf) and \
                cepoch < self.cparams.get('max_epochs',np.inf)
