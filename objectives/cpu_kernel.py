@@ -131,7 +131,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 tic = time.time()
                 ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
                     slices_sampled, rotd_sampled, rotc_sampled, envelope)
-                use_angular_correlation = False
+                use_angular_correlation = True
                 res['angular_correlation_timing'] = time.time() - tic
 
                 tic = time.time()
