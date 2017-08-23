@@ -159,7 +159,6 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                                 ac_slices_sampled, ac_data_sampled, \
                                 log_W_I, log_W_R, \
                                 sigma2, g, workspace)
-                        if np.random.randn() > 2: print("using angular correlation")
                     else:
                         if len(W_I_sampled) == 1:
                             like[idx], cphi_R, csigma2_est, ccorrelation, cpower, workspace = \

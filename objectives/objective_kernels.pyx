@@ -47,6 +47,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['sigma2_R'] = n.empty((N_R,N_T), dtype=n.float64)
         workspace['correlation_R'] = n.empty((N_R,N_T), dtype=n.float64)
         workspace['power_R'] = n.empty((N_R,N_T), dtype=n.float64)
+        workspace['g_R'] = n.empty((N_R,N_T), dtype=n.complex64)
         if workspace['N_R'] < N_R:
             workspace['e_R'] = n.empty((N_R,), dtype=n.float64)
             workspace['avgphi_R'] = n.empty((N_R,), dtype=n.float64)
@@ -862,6 +863,7 @@ def update_ac_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['sigma2_R'] = n.empty((N_R,N_T), dtype=n.float64)
         workspace['correlation_R'] = n.empty((N_R,N_T), dtype=n.float64)
         workspace['power_R'] = n.empty((N_R,N_T), dtype=n.float64)
+        workspace['g_R'] = n.empty((N_R,N_T), dtype=n.complex64)
         if workspace['N_R'] < N_R:
             workspace['e_R'] = n.empty((N_R,), dtype=n.float64)
             workspace['avgphi_R'] = n.empty((N_R,), dtype=n.float64)
