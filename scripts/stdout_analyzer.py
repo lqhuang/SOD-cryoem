@@ -6,48 +6,6 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 
-# reversed
-FACTOR = [1.0, 60.0, 3600.0, 86400.0]
-
-def time_converter(time_string):
-    time_string = time_string.lower().rstrip()
-    if time_string.endswith('s'):
-        time_string = time_string[:-1]
-    time_list = time_string.split(':')
-    time = 0
-    for i, value in enumerate(reversed(time_list)):
-        time += float(value) * FACTOR[i]
-    return time
-
-
-def timer(stdout_file):
-    pattern = 'Total Runtime - '
-    compiled_pattern = re.compile(pattern)
-
-    runtime = []
-
-    with open(stdout_file) as stdout_file:
-        for line in stdout_file:
-            splited_line = compiled_pattern.split(line)
-            if len(splited_line) >= 2:
-                time_str = splited_line[-1]
-                time = time_converter(time_str)
-                runtime.append(time)
-
-    total_runtime = np.asarray(runtime) / 3600.0
-    iteration = np.arange(total_runtime.shape[0])
-
-    fig, ax = plt.subplots()
-    ax.plot(iteration + 1, total_runtime)
-    ax.set_xlabel('Iteration: #')
-    ax.set_ylabel('Total Runtime (hours)')
-    ylim = ax.get_ylim()
-    ax.set_ylim([0, ylim[1]])
-    for i in range(0, 10000, 999):
-        ax.plot([i, i], [0, total_runtime[i]], linestyle='--', color='grey')
-        ax.text(i-500, total_runtime[i]+1, '{:.2f}'.format(total_runtime[i]))
-    plt.show()
-
 
 def is_eff(stdout_file):
     """    IS Speedup R / I / Total: 1239.74 (30 of 37465) / 40.43 (8 of 338) / 48094.08 (263 of 12663170)"""
@@ -129,6 +87,5 @@ def is_eff(stdout_file):
     plt.show()
 
 if __name__ == '__main__':
-    stdout_file = sys.argv[1]
-    timer(stdout_file)
-    is_eff(stdout_file)
+    stdout = sys.argv[1]
+    is_eff(stdout)
