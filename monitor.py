@@ -32,11 +32,11 @@ class ExpMonitor():
         self.expbase = expbase
 
         if ruserhost == None:
-            self.lbase = os.path.join(lbase, expbase, 'logs')
+            self.lbase = os.path.join(lbase, expbase)
         else:
             self.lbase = os.path.join(lbase, ruserhost, expbase)
 
-        self.rbase = os.path.join(rbase, expbase, 'logs')
+        self.rbase = os.path.join(rbase, expbase)
         self.ruserhost = ruserhost
 
         if not os.path.isdir(self.lbase):

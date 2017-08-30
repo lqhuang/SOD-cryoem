@@ -30,6 +30,25 @@ and follow it's progress with:
 
 $ tail -f exp/1AON_sagd_is/stdout
 
+Plots showing the current state of the reconstruction can be seen by using IPython (only python 2 for now):
+
+$ ipython --pylab=qt
+Python 2.7.8 (default, Apr 15 2015, 09:26:43) 
+Type "copyright", "credits" or "license" for more information.
+
+IPython 2.4.1 -- An enhanced Interactive Python.
+?         -> Introduction and overview of IPython's features.
+%quickref -> Quick reference.
+help      -> Python's own help system.
+object?   -> Details about 'object', use 'object??' for extra details.
+
+In [1]: import visualizer
+
+In [2]: vis = visualizer.Visualizer('exp/1AON_sagd_is',extra_plots=True)
+
+To update the displays, call vis.dowork():
+
+In [3]: vis.dowork()
 
 Running other data
 ------------------
