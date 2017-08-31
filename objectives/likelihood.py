@@ -685,7 +685,7 @@ class UnknownRSKernel:
         if self.sampler_S is not None:
             res['kern_timing']['prep_sample_S'] = np.empty(N_M)
 
-        res['angular_correlation_timing'] = 0
+        res['angular_correlation_timing'] = np.empty(N_M)
 
         return res
 

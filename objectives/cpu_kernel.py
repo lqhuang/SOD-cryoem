@@ -132,7 +132,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
                     slices_sampled, rotd_sampled, rotc_sampled, envelope)
                 use_angular_correlation = True
-                res['angular_correlation_timing'] = time.time() - tic
+                res['angular_correlation_timing'][idx] = time.time() - tic
 
                 tic = time.time()
                 if self.sampler_S is not None:
@@ -251,6 +251,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
         self.q.join()
         outputs['like_timing']['join'] = time.time() - tic
         outputs['kern_timing'] = dict([(k,np.sum(v)/self.numthreads) for k,v in outputs['kern_timing'].items()])
+        outputs['angular_correlation_timing'] = outputs['angular_correlation_timing'].sum(dtype=float) / self.numthreads
 
         # compute gradient of likelihood
         if compute_gradient:
