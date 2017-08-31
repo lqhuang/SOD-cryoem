@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 from .objective import Objective
 
+from six.moves import xrange
 import numpy as np
 
 import sys, time
