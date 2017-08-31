@@ -638,7 +638,7 @@ def speed_benchmark_comparison(model):
     old_time = np.zeros((num_rads, num_test))
     new_time = np.zeros((num_rads, num_test))
 
-    proj = projector.project(model, *ea, rad=1)
+    proj = projector.project(model, ea, rad=1)
     for i, rad in enumerate(rad_list):
         trunc_proj = projector.full_to_trunc(proj, rad)
         for j in range(num_test):
@@ -669,8 +669,8 @@ def angular_correlation_visulize(model, ea=None, rad=0.8):
     ea0 = [0, 0, 0]
     ea1 = [0, 0, 60]
 
-    ea0_proj = projector.project(model, *np.deg2rad(ea0))
-    ea1_proj = projector.project(model, *np.deg2rad(ea1))
+    ea0_proj = projector.project(model, np.deg2rad(ea0))
+    ea1_proj = projector.project(model, np.deg2rad(ea1))
 
     ea0_trunc = projector.full_to_trunc(ea0_proj, rad=rad)
     ac_trunc = correlation.calc_angular_correlation(ea0_trunc, N, rad)
