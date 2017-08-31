@@ -51,8 +51,7 @@ def trunc_to_full(trunc_samples, N, rad):
     return full_samples
 
 
-def project(model, *euler_angles, rad=0.95, truncate=False):
-
+def project(model, euler_angles, rad=0.95, truncate=False):
     if isinstance(model, str):
         M = mrc.readMRC(model)
     elif isinstance(model, np.ndarray):
