@@ -57,9 +57,6 @@ def project(model, euler_angles, rad=0.95, truncate=False):
     elif isinstance(model, np.ndarray):
         M = model
     
-    shape = np.asarray(M.shape)
-    assert (shape - shape.mean()).sum() == 0
-    
     N = M.shape[0]
     kernel = 'lanczos'
     ksize = 6
@@ -72,19 +69,7 @@ def project(model, euler_angles, rad=0.95, truncate=False):
     # premulter = 1
     fM = density.real_to_fspace(premulter * M)
 
-    if len(euler_angles) == 1:
-        euler_angles = np.asarray(euler_angles)
-        if euler_angles.ndim < 3:
-            pass
-        else:
-            euler_angles = euler_angles[0]
-        assert euler_angles.shape[1] == 3
-    elif len(euler_angles) == 3:
-        euler_angles = np.vstack(euler_angles).T
-        # assert euler_angles.shape[1] == 3
-    else:
-        raise NotImplementedError('unknown shape for Euler angles')
-
+    euler_angles = euler_angles.reshape((-1, 3))
     num_projs = euler_angles.shape[0]
     if truncate:
         projs = np.zeros((num_projs, TtoF.shape[1]), dtype=fM.dtype)
