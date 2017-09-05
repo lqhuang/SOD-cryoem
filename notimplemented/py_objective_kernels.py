@@ -198,6 +198,7 @@ def doimage_RIS(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices o
     # update working space
     workspace = update_workspace(workspace, N_R, N_I, N_S, N_T)
     g_I = workspace['g_I']
+    g_S = workspace['g_S']
 
     e_R = workspace['e_R']
     sigma2_R = workspace['sigma2_R']
@@ -227,6 +228,8 @@ def doimage_RIS(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices o
     use_envelope = envelope is not None
     use_whitenoise = not isinstance(sigma2, np.ndarray)
     computerGrad = g is not None
+    avgphi_S.fill(-np.inf)
+    avgphi_I.fill(-np.inf)
 
     if use_whitenoise:
         sigma2_white = sigma2
@@ -389,6 +392,7 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
     use_envelope = envelope is not None
     use_whitenoise = not isinstance(sigma2, np.ndarray)
     computerGrad = g is not None
+    avgphi_I.fill(-np.inf)
 
     if use_whitenoise:
         sigma2_white = sigma2
@@ -481,7 +485,7 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
         else:
             tiled_phitmp *= -2.0 * div_in
             g[:] = tiled_phitmp * g
-            
+
     ei = my_logsumexp(N_I, avgphi_I)
     avgphi_I[:] = avgphi_I - ei
 
