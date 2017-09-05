@@ -1,13 +1,12 @@
 #cython: boundscheck=False
 
-# from six.moves import xrange
-
 import numpy as n
 cimport numpy as n
 import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},reload_support=True)
 
 from libc.string cimport memset
 from libc.math cimport exp, log, log1p, isfinite
+
 
 cdef double my_logsumexp(unsigned int N, double *a) nogil:
     cdef double a_max
@@ -39,6 +38,7 @@ cdef double my_logaddexp(double a, double b) nogil:
         else:
             return tmp
 
+
 def update_workspace(workspace, N_R, N_I, N_S, N_T):
     if workspace is None:
         workspace = {'N_R':0,'N_I':0,'N_S':0,'N_T':0}
@@ -58,6 +58,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['correlation_I'] = n.empty((N_I, N_T), dtype=n.float64)
         workspace['power_I'] = n.empty((N_I, N_T), dtype=n.float64)
         workspace['g_I'] = n.empty((N_I,N_T), dtype=n.complex64)
+        workspace['e_ac_I'] = n.empty((1,), dtype=n.float64)
         if workspace['N_I'] < N_I:
             workspace['e_I'] = n.empty((N_I,), dtype=n.float64)
             workspace['avgphi_I'] = n.empty((N_I,), dtype=n.float64)
@@ -86,6 +87,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
     workspace['N_T'] = N_T
         
     return workspace
+
 
 """
 This function computes the negative log likelihood of a single image an
@@ -855,55 +857,6 @@ def doimage_RI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume (N
     return lse_in, (avgphi_I[:N_I], avgphi_R[:N_R]), sigma2_est, correlation, power, workspace
 
 
-def update_ac_workspace(workspace, N_R, N_I, N_S, N_T):
-    if workspace is None:
-        workspace = {'N_R':0,'N_I':0,'N_S':0,'N_T':0}
-
-    if N_R is not None and workspace['N_R'] < N_R or workspace['N_T'] != N_T:
-        workspace['sigma2_R'] = n.empty((N_R,N_T), dtype=n.float64)
-        workspace['correlation_R'] = n.empty((N_R,N_T), dtype=n.float64)
-        workspace['power_R'] = n.empty((N_R,N_T), dtype=n.float64)
-        workspace['g_R'] = n.empty((N_R,N_T), dtype=n.complex64)
-        if workspace['N_R'] < N_R:
-            workspace['e_R'] = n.empty((N_R,), dtype=n.float64)
-            workspace['avgphi_R'] = n.empty((N_R,), dtype=n.float64)
-        workspace['N_R'] = N_R
-        
-    if N_I is not None and (workspace['N_I'] < N_I or workspace['N_T'] != N_T):
-        workspace['sigma2_I'] = n.empty((N_I, N_T), dtype=n.float64)
-        workspace['correlation_I'] = n.empty((N_I, N_T), dtype=n.float64)
-        workspace['power_I'] = n.empty((N_I, N_T), dtype=n.float64)
-        workspace['g_I'] = n.empty((N_I,N_T), dtype=n.complex64)
-        workspace['e_ac_I'] = n.empty((1,), dtype=n.float64)
-        if workspace['N_I'] < N_I:
-            workspace['e_I'] = n.empty((N_I,), dtype=n.float64)
-            workspace['avgphi_I'] = n.empty((N_I,), dtype=n.float64)
-        workspace['N_I'] = N_I
-        
-    if N_S is not None and (workspace['N_S'] < N_S or workspace['N_T'] != N_T):
-        workspace['sigma2_S'] = n.empty((N_S, N_T), dtype=n.float64)
-        workspace['correlation_S'] = n.empty((N_S, N_T), dtype=n.float64)
-        workspace['power_S'] = n.empty((N_S, N_T), dtype=n.float64)
-        workspace['g_S'] = n.empty((N_S,N_T), dtype=n.complex64)
-        if workspace['N_S'] < N_S:
-            workspace['e_S'] = n.empty((N_S,), dtype=n.float64)
-            workspace['avgphi_S'] = n.empty((N_S,), dtype=n.float64)
-        workspace['N_S'] = N_S
-        
-    if workspace['N_T'] != N_T:
-        workspace['sigma2_est']  = n.zeros((N_T,), dtype=n.float64)
-        workspace['correlation'] = n.zeros((N_T,), dtype=n.float64)
-        workspace['power'] = n.zeros((N_T,), dtype=n.float64)
-        workspace['nttmp'] = n.empty((N_T,), dtype=n.float64)
-    else:
-        workspace['sigma2_est'][:] = 0
-        workspace['correlation'][:] = 0
-        workspace['power'][:] = 0
-
-    workspace['N_T'] = N_T
-        
-    return workspace
-
 """
 This function computes the negative log likelihood of a single image an
 its gradient.  It also computes the phi vectors needed for importance sampling
@@ -941,7 +894,7 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
     assert ctf.shape[1] == N_T
     assert d.shape[1] == N_T
 
-    workspace = update_ac_workspace(workspace,N_R,N_I,None,N_T)
+    workspace = update_workspace(workspace,N_R,N_I,None,N_T)
 
     cdef n.ndarray[n.complex64_t, ndim=2] g_R = workspace['g_R']
     cdef n.ndarray[n.complex64_t, ndim=2] g_I = workspace['g_I']
