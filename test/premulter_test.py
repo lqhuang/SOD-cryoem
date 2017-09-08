@@ -11,8 +11,9 @@ import density
 from cryoio import mrc
 import cryoops
 
+cython_build_dirs = os.path.expanduser('~/.pyxbld/angular_correlation')
 import pyximport; pyximport.install(
-    setup_args={"include_dirs": np.get_include()}, reload_support=True)
+    build_dir=cython_build_dirs, setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
 
 

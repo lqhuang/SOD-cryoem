@@ -1,3 +1,4 @@
+import os.path
 import numpy as np
 import time
 
@@ -6,7 +7,8 @@ import scipy.sparse as sp
 
 from .fixed import FixedImportanceSampler
 
-import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
+cython_build_dirs = os.path.expanduser('~/.pyxbld/angular_correlation')
+import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs":np.get_include()},reload_support=True)
 from . import fisher_util
 
 

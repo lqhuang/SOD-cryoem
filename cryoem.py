@@ -1,11 +1,14 @@
 from __future__ import print_function, division
 
+import os.path
+
 import numpy as np
 from geometry import gencoords
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
 
-import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
+cython_build_dirs = os.path.expanduser('~/.pyxbld/angular_correlation')
+import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sparsemul
 
 

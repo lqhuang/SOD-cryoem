@@ -1,5 +1,7 @@
 from __future__ import print_function, division
 
+import os.path
+
 from six.moves import xrange
 
 from threading import Thread, Lock
@@ -13,7 +15,8 @@ import numpy as np
 
 from cryoem import getslices
 
-import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
+cython_build_dirs = os.path.expanduser('~/.pyxbld/angular_correlation')
+import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs":np.get_include()},reload_support=True)
 from . import objective_kernels
 
 from objectives.likelihood import UnknownRSKernel

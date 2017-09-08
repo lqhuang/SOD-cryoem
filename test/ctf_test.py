@@ -15,7 +15,8 @@ import cryoops as coops
 from correlation_benchmark import vis_real_space_comparison, calc_difference
 from notimplemented.correlation import calc_angular_correlation
 
-import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
+cython_build_dirs = os.path.expanduser('~/.pyxbld/angular_correlation')
+import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
 
 
