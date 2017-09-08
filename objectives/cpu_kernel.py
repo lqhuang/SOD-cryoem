@@ -131,11 +131,14 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 res['kern_timing']['prep'][idx] = time.time() - tic
 
                 # get angular correlation slices
-                tic = time.time()
-                ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
-                    slices_sampled, rotd_sampled, rotc_sampled, envelope)
                 use_angular_correlation = True
-                res['angular_correlation_timing'][idx] = time.time() - tic
+                if use_angular_correlation:
+                    tic = time.time()
+                    ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
+                        slices_sampled, rotd_sampled, rotc_sampled, envelope)
+                    res['angular_correlation_timing'][idx] = time.time() - tic
+                else:
+                    res['angular_correlation_timing'][idx] = 0
 
                 tic = time.time()
                 if self.sampler_S is not None:

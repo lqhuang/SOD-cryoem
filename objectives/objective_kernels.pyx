@@ -1,8 +1,11 @@
 #cython: boundscheck=False
 
+import os.path
+
 import numpy as n
 cimport numpy as n
-import pyximport; pyximport.install(setup_args={"include_dirs":n.get_include()},reload_support=True)
+cython_build_dirs=os.path.expanduser('~/.pyxbld/angular_correlation')
+import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs":n.get_include()},reload_support=True)
 
 from libc.string cimport memset
 from libc.math cimport exp, log, log1p, isfinite
@@ -51,6 +54,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         if workspace['N_R'] < N_R:
             workspace['e_R'] = n.empty((N_R,), dtype=n.float64)
             workspace['avgphi_R'] = n.empty((N_R,), dtype=n.float64)
+            workspace['argmin_e_R'] = n.empty((N_R,), dtype=n.int64)
         workspace['N_R'] = N_R
         
     if N_I is not None and (workspace['N_I'] < N_I or workspace['N_T'] != N_T):
@@ -905,6 +909,7 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
     cdef n.ndarray[n.float64_t, ndim=2] correlation_R  = workspace['correlation_R']
     cdef n.ndarray[n.float64_t, ndim=2] power_R  = workspace['power_R']
     cdef n.ndarray[n.float64_t, ndim=1] avgphi_R  = workspace['avgphi_R']
+    cdef n.ndarray[n.int64_t, ndim=1] argmin_e_R = workspace['argmin_e_R']
 
     cdef n.ndarray[n.float64_t, ndim=1] e_ac_I = workspace['e_ac_I']
     cdef n.ndarray[n.float64_t, ndim=1] e_I  = workspace['e_I']
@@ -1003,56 +1008,66 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
         e = my_logsumexp(N_R,<double*>e_R.data)
         lse_in = -e
 
-        ### ! get indice r for maximum e_R and calculate this cproj[r] with each rotated data
-        r = 0
-        for max_r in xrange(N_R):
-            if e_R[max_r] > max_e_R:
-                r = max_r
-                max_e_R = e_R[max_r]
-        for i in xrange(N_I):
-            for t in xrange(N_T):
-                cproj = ctf[i, t] * slices[r, t]  # current slice
-                cim = d[i, t]  # current data
+    argmin_e_R = e_R.argsort()
+    with nogil:
+        ### ! get indices r for top 10 maximum e_R and calculate this cproj[r] with each rotated data
+        for max_r in xrange(10):
+            r = argmin_e_R[N_R-max_r-1]
+            for i in xrange(N_I):
+                # Compute the error at each frequency
+                for t in xrange(N_T):
+                    cproj = ctf[i, t] * slices[r, t]  # current slice
+                    cim = d[i, t]  # current data
 
-                correlation_I[i,t] = cproj.real*cim.real + cproj.imag*cim.imag
-                power_I[i,t] = cproj.real*cproj.real + cproj.imag*cproj.imag
+                    correlation_I[i,t] = cproj.real*cim.real + cproj.imag*cim.imag
+                    power_I[i,t] = cproj.real*cproj.real + cproj.imag*cproj.imag
 
-                if use_envelope:
-                    g_I[i,t] = envelope[t]*cproj - cim
-                else:
-                    g_I[i,t] = cproj - cim
+                    if use_envelope:
+                        g_I[i,t] = envelope[t]*cproj - cim
+                    else:
+                        g_I[i,t] = cproj - cim
                     
-            # Compute the log likelihood
-            tmp = 0
-            if use_whitenoise:
-                for t in xrange(N_T):
-                    sigma2_I[i,t] = g_I[i,t].real**2 + g_I[i,t].imag**2
-                    tmp += sigma2_I[i,t]
-            else:
-                for t in xrange(N_T):
-                    sigma2_I[i,t] = g_I[i,t].real**2 + g_I[i,t].imag**2
-                    tmp += sigma2_I[i,t] / sigma2_coloured[t]
-            e_I[i] = div_in*tmp + logW_I[i]
+                # Compute the log likelihood
+                tmp = 0
+                if use_whitenoise:
+                    for t in xrange(N_T):
+                        sigma2_I[i,t] = g_I[i,t].real**2 + g_I[i,t].imag**2
+                        tmp += sigma2_I[i,t]
+                else:
+                    for t in xrange(N_T):
+                        sigma2_I[i,t] = g_I[i,t].real**2 + g_I[i,t].imag**2
+                        tmp += sigma2_I[i,t] / sigma2_coloured[t]
+                e_I[i] = div_in*tmp + logW_I[i]
 
-            # Compute the gradient
-            if computeGrad:
-                for t in xrange(N_T):
-                    g_I[i,t] = ctf[i,t]*g_I[i,t]
+                # Compute the gradient
+                if computeGrad:
+                    for t in xrange(N_T):
+                        g_I[i,t] = ctf[i,t]*g_I[i,t]
 
-        etmp = my_logsumexp(N_I, <double*>e_I.data)
+            etmp = my_logsumexp(N_I, <double*>e_I.data)
+            # e_R[r] = etmp + logW_R[r]
 
-        tmp = logW_I[i]
-        for i in xrange(N_I):
-            phitmp = exp(e_I[i] - etmp)
-            avgphi_I[i] = my_logaddexp(avgphi_I[i], tmp + e_I[i])
-            for t in xrange(N_T):
-                correlation_I[i,t] = phitmp * correlation_I[i,t]
-                power_I[i,t] = phitmp * power_I[i,t]
-                sigma2_I[i,t] = phitmp * sigma2_I[i,t]
+            # Noise estimate
+            # sigma2_R[r,t], correlation_R[r,t], power_R[r,t]
+            # have been calculated in previous process.
+            # for t in xrange(N_T):
+                # sigma2_R[r,t] = 0
+                # correlation_R[r,t] = 0
+                # power_R[r,t] = 0
 
-            if computeGrad:
-                for t in xrange(N_T):
-                    g[r, t] = g[r, t] + phitmp * g_I[i, t]
+            tmp = logW_R[r]
+            for i in xrange(N_I):
+                phitmp = exp(e_I[i] - etmp)
+                avgphi_I[i] = my_logaddexp(avgphi_I[i], tmp + e_I[i])
+                # need this ?
+                # for t in xrange(N_T):
+                #     correlation_R[r,t] += phitmp * correlation_I[i,t]
+                #     power_R[r,t] += phitmp * power_I[i,t]
+                #     sigma2_R[r,t] += phitmp * sigma2_I[i,t]
+
+                if computeGrad:
+                    for t in xrange(N_T):
+                        g[r, t] = g[r, t] + phitmp * g_I[i, t]
 
         ei = my_logsumexp(N_I, <double*>avgphi_I.data)
         lse_in += -ei

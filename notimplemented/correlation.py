@@ -12,12 +12,6 @@ from scipy.stats import threshold
 import geometry
 import density
 
-fftmod = np.fft
-USINGFFTW = False
-fft_threads = None
-real_t = np.float32
-complex_t = np.complex64
-
 
 def cart2pol(*coords):
     """Convert cartesian coordinates to polar coordinates.
@@ -55,56 +49,6 @@ def pol2cart(*coords):
         return x, y
     else:
         raise ValueError('inappropriate arguments')
-
-
-def real_to_fspace(M, axes=None, threads=None):
-    """ Convert real-space M to (unitary) Fourier space """
-    if USINGFFTW:
-        if threads is None:
-            threads = fft_threads
-        ret = np.require(np.fft.fftshift(fftmod.fftn(np.fft.fftshift(M, axes=axes),
-                                                     axes=axes, threads=threads),
-                                         axes=axes),
-                         dtype=complex_t)
-    else:
-        ret = np.require(np.fft.fftshift(fftmod.fftn(np.fft.fftshift(M, axes=axes),
-                                                     axes=axes),
-                                         axes=axes),
-                         dtype=complex_t)
-        ret = np.require(np.fft.fftshift(fftmod.fftn(np.fft.fftshift(M))),
-                         dtype=complex_t)
-    # nrm is the scaling factor needed to make an unnormalized FFT a
-    # unitary transform
-    if axes is None:
-        nrm = 1.0 / np.sqrt(np.prod(M.shape))
-    else:
-        nrm = 1.0 / np.sqrt(np.prod(np.array(M.shape)[np.array(axes)]))
-    ret *= nrm
-    return ret
-
-
-def fspace_to_real(fM, axes=None, threads=None):
-    """ Convert unitary Fourier space fM to real space """
-    if USINGFFTW:
-        if threads is None:
-            threads = fft_threads
-        ret = np.require(np.fft.ifftshift(fftmod.ifftn(np.fft.ifftshift(fM, axes=axes),
-                                                       axes=axes, threads=threads),
-                                          axes=axes).real,
-                         dtype=real_t)
-    else:
-        ret = np.require(np.fft.ifftshift(fftmod.ifftn(np.fft.ifftshift(fM, axes=axes),
-                                                       axes=axes),
-                                          axes=axes).real,
-                         dtype=real_t)
-    # nrm is the scaling factor needed to make an unnormalized FFT a
-    # unitary transform
-    if axes is None:
-        nrm = np.sqrt(np.prod(fM.shape))
-    else:
-        nrm = np.sqrt(np.prod(np.array(fM.shape)[np.array(axes)]))
-    ret *= nrm
-    return ret
 
 
 # Image center:
@@ -259,27 +203,27 @@ def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
     angular_correlation = np.zeros_like(trunc_slices, dtype=trunc_slices.dtype)
     for i, count in enumerate(unique_counts):
         indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
-        if count < 2:
+        if count < 4:
             angular_correlation[indices]  = np.copy(sorted_slice[indices])
         else:
             # use view (slicing) or copy (fancy indexing, np.take(), np.put())?
             same_rho = np.copy(sorted_slice[indices])
-            fpcimg_real = real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
-            angular_correlation[indices].real = fspace_to_real(
+            fpcimg_real = density.real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
+            angular_correlation[indices].real = density.fspace_to_real(
                 fpcimg_real * fpcimg_real.conjugate(), axes=(axis,)).real
             if iscomplex:  # FIXME: stupid way. optimize this
-                fpcimg_fourier = real_to_fspace(same_rho.imag, axes=(axis,))  # polar image in fourier sapce
-                angular_correlation[indices].imag = fspace_to_real(
+                fpcimg_fourier = density.real_to_fspace(same_rho.imag, axes=(axis,))  # polar image in fourier sapce
+                angular_correlation[indices].imag = density.fspace_to_real(
                     fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,)).real
 
     # 4.
     if clip:
         factor = 3
         for i, count in enumerate(unique_counts):
-            indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
-            if count < 10:
+            if count <= 10:
                 pass
             else:
+                indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
                 mean = angular_correlation[indices].mean(axis)
                 std = angular_correlation[indices].std(axis)
                 vmin = mean - std * factor
@@ -292,8 +236,9 @@ def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
     return corr_trunc_slices
 
 
-def calc_full_ac(image, rad, outside=True, **ac_kwargs):    
-    import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
+def calc_full_ac(image, rad, outside=True, **ac_kwargs):
+    cython_build_dirs=os.path.expanduser('~/.pyxbld/angular_correlation')
+    import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs": np.get_include()}, reload_support=True)
     import sincint
 
     assert image.ndim == 2, "wrong dimension"
