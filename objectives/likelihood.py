@@ -879,17 +879,21 @@ class UnknownRSKernel:
             if cphi_S is not None:
                 res['CV2_S'][idx] = (1.0/np.sum(cphi_S**2,dtype=np.float64))
 
-    def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope):
+    def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I):
+        psize = self.params['pixel_size']
+
         N_R, N_T = slices_sampled.shape
         assert rotd_sampled[0].shape == rotc_sampled[0].shape
         assert rotd_sampled[0].shape[0] == N_T
 
+        argmax_W_I = W_I.argmax()
         if envelope is not None:
             assert envelope.shape[0] == slices_sampled.shape[1], "wrong length for envelope"
-            slices_sampled = np.tile(envelope, (N_R, 1)) * np.tile(rotc_sampled[0], (N_R, 1)) \
+            slices_sampled = np.tile(envelope, (N_R, 1)) \
+                             * np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
                              * slices_sampled
-        
-        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad)
-        ac_data = correlation.calc_angular_correlation(rotc_sampled[0] * rotd_sampled[0], self.N, self.rad)
+
+        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, psize)
+        ac_data = correlation.calc_angular_correlation(rotd_sampled[argmax_W_I], self.N, self.rad, psize)
         
         return ac_slices, ac_data
