@@ -225,7 +225,7 @@ class SimpleDataset():
             raise NotImplementedError("CTF is disable here.")
 
 
-def dataset_loading_test(data_dir, params, plot_figures=False):
+def dataset_loading_test(params, visualize=False):
     imgpath = params['inpath']
     psize = params['resolution']
     imgstk = MRCImageStack(imgpath, psize)
@@ -257,7 +257,7 @@ def dataset_loading_test(data_dir, params, plot_figures=False):
     premult = premult.reshape((-1,1)) * premult.reshape((1,-1))
     fspace_stack.set_transform(premult, 1)
 
-    if plot_figures:
+    if visualize:
         rad = 0.99
         coords = geometry.gencoords(N, 2).reshape((N**2, 2))
         Cs = np.sum(coords**2, axis=1).reshape((N, N)) > (rad * N / 2.0 - 1.5)**2
@@ -276,10 +276,10 @@ def dataset_loading_test(data_dir, params, plot_figures=False):
 if __name__ == '__main__':
     print(sys.argv)
     dataset_dir = sys.argv[1]
-    params = {
+    data_params = {
         'dataset_name': "1AON",
-        'inpath': os.path.join(data_dir, 'imgdata.mrc'),
-        'ctfpath': os.path.join(data_dir, 'defocus.txt'),
+        'inpath': os.path.join(dataset_dir, 'imgdata.mrc'),
+        'ctfpath': os.path.join(dataset_dir, 'defocus.txt'),
         'microscope_params': {'akv': 200, 'wgh': 0.07, 'cs': 2.0},
         'resolution': 2.8,
         'sigma': 'noise_std',
@@ -290,4 +290,4 @@ if __name__ == '__main__':
         'num_partitions': 0,
         'random_seed': 1
     }
-    cryodata, fstack = dataset_loading_test(dataset_dir, params, plot_figures=True)
+    cryodata, fstack = dataset_loading_test(data_params, visualize=True)

@@ -91,7 +91,7 @@ def plotwinkeltriple(dirs, values, spot=None, others=None, vmin=None, vmax=None,
 # ------------------------------------------------------------------- #
 
 
-def kernel_test(data_dir, model_file):
+def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shifts=False):
     model = mrc.readMRC(model_file)
     density_totalmass = 80000
     if density_totalmass is not None:
@@ -117,14 +117,16 @@ def kernel_test(data_dir, model_file):
         'random_seed': 1,
         # 'symmetry': 'C7'
     }
-    cryodata, _ = dataset_loading_test(data_dir, data_params)
+    cryodata, _ = dataset_loading_test(data_params)
     minibatch = cryodata.get_next_minibatch(shuffle_minibatches=False)
 
     is_sym = get_symmetryop(data_params.get('symmetry',None))
     sampler_R = FixedFisherImportanceSampler('_R', is_sym)
     sampler_I = FixedFisherImportanceSampler('_I')
-    # sampler_S = FixedGaussianImportanceSampler('_S')
-    sampler_S = None
+    if sample_shifts:
+        sampler_S = FixedGaussianImportanceSampler('_S')
+    else:
+        sampler_S = None
 
     cparams = {'iteration': 0,'pixel_size': cryodata.pixel_size, 'max_frequency': 0.02,
         'interp_kernel_R': 'lanczos',
@@ -151,6 +153,13 @@ def kernel_test(data_dir, model_file):
     kernel.set_data(cparams, minibatch)
     kernel.using_precomp_slicing = False
     kernel.using_precomp_inplane = False
+    kernel.fM = fM
+    kernel.use_angular_correlation = use_angular_correlation
+    return kernel
+
+
+def kernel_test(data_dir, model_file, use_angular_correlation=True):
+    kernel = load_kernel(data_dir, model_file, use_angular_correlation)
 
     euler_angles = []
     with open(os.path.join(data_dir, 'ctf_gt.par')) as par:
@@ -161,38 +170,37 @@ def kernel_test(data_dir, model_file):
             euler_angles.append([float(line[1]), float(line[2]), float(line[3])])
     euler_angles = np.asarray(euler_angles)
 
-    for idx in range(minibatch['N_M']):
+    for idx in range(kernel.minibatch['N_M']):
         img_idx = kernel.minibatch['img_idxs'][idx]
         ea = euler_angles[img_idx]
         ea_vec = geometry.genDir([ea]).reshape(1, -1)
 
-        if sampler_S is not None:
+        if kernel.sampler_S is not None:
             slice_ops, envelope, \
             W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
             W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
             W_S_sampled, sampleinfo_S, S_sampled = \
-                kernel.prep_operators(fM, idx)
+                kernel.prep_operators(kernel.fM, idx)
         else:
             slice_ops, envelope, \
             W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
             W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
-                kernel.prep_operators(fM, idx)
+                kernel.prep_operators(kernel.fM, idx)
 
-        use_angular_correlation = True
-        if use_angular_correlation:
+        if kernel.use_angular_correlation:
             tic = time.time()
             ac_slices_sampled, ac_data_sampled = kernel.get_angular_correlation(
-                slices_sampled, rotd_sampled, rotc_sampled, envelope)
+                slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I_sampled)
 
         sigma2 = kernel.inlier_sigma2_trunc
         workspace = None
         g = np.zeros(slices_sampled.shape, dtype=np.complex64)
         log_W_R = np.log(W_R_sampled)
         log_W_I = np.log(W_I_sampled)
-        if sampler_S is not None:
+        if kernel.sampler_S is not None:
             log_W_S = np.log(W_S_sampled)
 
-        if use_angular_correlation:
+        if kernel.use_angular_correlation:
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
                 objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                     rotc_sampled, rotd_sampled, \
@@ -200,7 +208,7 @@ def kernel_test(data_dir, model_file):
                     log_W_I, log_W_R, \
                     sigma2, g, workspace)
         else:
-            if sampler_S is not None:
+            if kernel.sampler_S is not None:
                 like, (cphi_S,cphi_I,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
                     objective_kernels.doimage_RIS(slices_sampled, \
                         S_sampled, envelope, \
@@ -216,10 +224,16 @@ def kernel_test(data_dir, model_file):
 
         workspace['cphi_R'] = cphi_R
         workspace['cphi_I'] = cphi_I
-        if sampler_S is not None:
+        if kernel.sampler_S is not None:
             workspace['cphi_S'] = cphi_S
     
         SimpleKernel.plot_distribution(workspace, kernel.quad_domain_R, kernel.quad_domain_I, correct_ea=ea)
+
+        isw = 1
+        logspace_phis = True
+        testImg = kernel.minibatch['test_batch']
+        kernel.sampler_R.record_update(idx, sampleinfo_R[1], cphi_R, sampleinfo_R[2], isw, testImg, logspace = logspace_phis)
+        kernel.sampler_I.record_update(idx, sampleinfo_I[1], cphi_I, sampleinfo_I[2], isw, testImg, logspace = logspace_phis)
 
     return kernel
 
@@ -240,6 +254,8 @@ class SimpleKernel():
 
         self.G_datatype = np.complex64
 
+        self.cached_workspace = dict()
+
     def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope):
         N_R, N_T = slices_sampled.shape
         assert rotd_sampled[0].shape == rotc_sampled[0].shape
@@ -252,8 +268,8 @@ class SimpleKernel():
         else:
             slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
         
-        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad)
-        ac_data = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad)
+        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, self.psize)
+        ac_data = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad, self.psize)
         
         return ac_slices, ac_data
 
@@ -360,30 +376,9 @@ class SimpleKernel():
             self.rad = rad
 
     def prep_operators(self, idx):
-        # compute operators and slices
-        # slicing samples
-        W_R = self.slice_quad['W']
-        W_R_sampled = np.require(W_R, dtype=density.real_t)
-        samples_R = np.arange(self.N_R)
-        sampleinfo_R = None  # N_R_sampled, samples_R, sampleweights_R
-        # self.slice_ops = self.quad_domain_R.compute_operator(self.slice_interp, self.samples_R)
-        slice_ops = self.slice_ops
-        if self.use_cached_slicing and self.slices_sampled is not None:
-            slices_sampled = self.slices_sampled
-        else:
-            fM = self.get_fft(self.model, self.slice_interp)
-            slices_sampled = cryoem.getslices(fM, self.slice_ops).reshape((self.N_R, self.N_T))
-            # slices_sampled /= self.cryodata.real_noise_var  # balance between slicing and data?
-            self.slices_sampled = slices_sampled
-            
-        # inplane samples
-        W_I = self.inplane_quad['W']
-        W_I_sampled = np.require(W_I, dtype=density.real_t)
-        sampleinfo_I = None  # N_I_sampled, samples_I, sampleweights_I
-        # self.inplane_ops = self.quad_domain_I.compute_operator(self.interp_params_I, self.samples_I)
-        curr_fft_image = self.cryodata.get_fft_image(idx)
-        print('max intensity for fft proj:', curr_fft_image.max())
-        rotd_sampled = cryoem.getslices(curr_fft_image, self.inplane_ops).reshape((self.N_I, self.N_T))
+        N_R = self.N_R
+        N_I = self.N_I
+        N_T = self.N_T
 
         # ctf samples
         envelope = self.envelope
@@ -394,10 +389,42 @@ class SimpleKernel():
             rotc_sampled = np.ones_like(rotd_sampled, dtype=density.real_t)
             rotc_sampled[:, 0:3] = 0.0
 
+        # compute operators and slices
+        # slicing samples
+        W_R = self.slice_quad['W']
+        W_R_sampled = np.require(W_R, dtype=density.real_t)
+        samples_R = np.arange(N_R)
+        sampleinfo_R = None  # N_R_sampled, samples_R, sampleweights_R
+        # self.slice_ops = self.quad_domain_R.compute_operator(self.slice_interp, self.samples_R)
+        slice_ops = self.slice_ops
+        if self.use_cached_slicing and self.slices_sampled is not None:
+            slices_sampled = self.slices_sampled
+            ac_slices_sampled = self.ac_slices_sampled
+        else:
+            fM = self.get_fft(self.model, self.slice_interp)
+            slices_sampled = cryoem.getslices(fM, self.slice_ops).reshape((N_R, N_T))
+            # slices_sampled /= self.cryodata.real_noise_var  # balance between slicing and data?
+            self.slices_sampled = slices_sampled
+            # compute angular correlation
+            if envelope is not None:
+                assert envelope.shape[0] == slices_sampled.shape[1], "wrong length for envelope"
+                slices_sampled = np.tile(envelope, (N_R, 1)) * np.tile(rotc_sampled[0], (N_R, 1)) \
+                                * slices_sampled
+            else:
+                slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
+            ac_slices_sampled = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, self.psize)
+            self.ac_slices_sampled = ac_slices_sampled
+            
+        # inplane samples
+        W_I = self.inplane_quad['W']
+        W_I_sampled = np.require(W_I, dtype=density.real_t)
+        sampleinfo_I = None  # N_I_sampled, samples_I, sampleweights_I
+        # self.inplane_ops = self.quad_domain_I.compute_operator(self.interp_params_I, self.samples_I)
+        curr_fft_image = self.cryodata.get_fft_image(idx)
+        print('max intensity for fft proj:', curr_fft_image.max())
+        rotd_sampled = cryoem.getslices(curr_fft_image, self.inplane_ops).reshape((N_I, N_T))
         # compute angular correlation
-        if self.use_angular_correlation:
-            ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
-                slices_sampled, rotd_sampled, rotc_sampled, self.envelope)
+        ac_data_sampled = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad, self.psize)
 
         if self.use_angular_correlation:
             return slice_ops, envelope, \
@@ -432,13 +459,12 @@ class SimpleKernel():
             print('max intensity for ac_slices_sampled:', ac_slices_sampled.max())
             print('max intensity for ac_data_sampled:', ac_data_sampled.max())
 
-
         log_W_I = np.log(W_I_sampled)
         log_W_R = np.log(W_R_sampled)
 
         if self.use_angular_correlation:
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                objective_kernels.doimage_ACRI(slices_sampled, envelope, \
+                py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                     rotc_sampled, rotd_sampled, \
                     ac_slices_sampled, ac_data_sampled, \
                     log_W_I, log_W_R, \
@@ -451,11 +477,13 @@ class SimpleKernel():
                     sigma2, g, workspace)
 
         print("Like", like)
+        workspace['like'] = like
         workspace['cphi_I'] = cphi_I
         workspace['cphi_R'] = cphi_R
 
+        self.cached_workspace[idx] = workspace
         return workspace
-    
+
     def plot_quadrature(self):
         import healpy as hp
         fig_slicing = plt.figure(num=0)
@@ -472,6 +500,32 @@ class SimpleKernel():
         ax.grid(True)
 
         plt.show()
+
+    def plot_rmsd(self):
+        processed_idxs = self.cached_workspace.keys()
+        quad_domain_R = self.quad_domain_R
+
+        num_idxs = len(processed_idxs)
+        top1_rmsd = np.zeros(num_idxs)
+        topN_rmsd = np.zeros(num_idxs)
+        cutoff_R = 10
+        topN_weight = np.exp(-np.arange(cutoff_R) / 2)
+        topN_weight /= topN_weight.sum()
+
+        for i, idx in enumerate(processed_idxs):
+            ea = self.cryodata.euler_angles[idx][0:2]
+            tiled_ea = np.tile(ea, (cutoff_R, 1))
+            cphi_R = self.cached_workspace[idx]['cphi_R']
+            sorted_indices_R = (-cphi_R).argsort()
+            potential_R = quad_domain_R.dirs[sorted_indices_R[0:cutoff_R]]
+            eas_of_dirs = geometry.genEA(potential_R)[:, 0:2]
+            top1_rmsd[i] = np.sqrt(((ea[0:2] - eas_of_dirs[0])**2).mean())
+            topN_rmsd[i] = (np.sqrt(((tiled_ea - eas_of_dirs) ** 2).mean(axis=1)) * topN_weight).sum()
+
+        print("Slicing quadrature scheme, resolution {}, num of points {}".format(
+            quad_domain_R.resolution, len(quad_domain_R.dirs)))
+        print("Top 1 RMSD:", top1_rmsd.mean())
+        print("Top {} RMSD: {}".format(cutoff_R, topN_rmsd.mean()))
 
     @staticmethod
     def get_fft(img, interp_params):
@@ -495,15 +549,15 @@ class SimpleKernel():
 
     @staticmethod
     def plot_distribution(workspace, quad_domain_R, quad_domain_I, correct_ea=None, lognorm=False):
-        e_R = np.asarray(workspace['cphi_R'])
-        e_I = np.asarray(workspace['cphi_I'])
+        phi_R = np.asarray(workspace['cphi_R'])
+        phi_I = np.asarray(workspace['cphi_I'])
 
-        sorted_indices_R = (-e_R).argsort()
-        sorted_indices_I = (-e_I).argsort()
+        sorted_indices_R = (-phi_R).argsort()
+        sorted_indices_I = (-phi_I).argsort()
 
-        # cutoff_idx_R = np.diff((-e_R)[sorted_indices_R]).argmax() + 1
         cutoff_idx_R = 10
-        cutoff_idx_I = np.diff((-e_I)[sorted_indices_I]).argmax() + 1
+        # cutoff_idx_R = np.diff((-phi_R)[sorted_indices_R]).argmax() + 1
+        cutoff_idx_I = np.diff((-phi_I)[sorted_indices_I]).argmax() + 1
         potential_R = quad_domain_R.dirs[sorted_indices_R[0:cutoff_idx_R]]
         potential_I = quad_domain_I.theta[sorted_indices_I[0:cutoff_idx_I]]
 
@@ -516,20 +570,22 @@ class SimpleKernel():
         gs = gridspec.GridSpec(1, 3)
 
         ax_slicing = fig.add_subplot(gs[0:2])
-        plotwinkeltriple(quad_domain_R.dirs, -e_R, spot=spot, others=potential_R,
-                         vmin=-e_R.max(), vmax=-e_R.min(), lognorm=lognorm, axes=ax_slicing)
+        plotwinkeltriple(quad_domain_R.dirs, -phi_R, spot=spot, others=potential_R,
+                         vmin=-phi_R.max(), vmax=-phi_R.min(), lognorm=lognorm, axes=ax_slicing)
         ax_slicing.set_title('slicing distribution for likelihood')
 
         ax_inplane = fig.add_subplot(gs[-1], projection='polar')
-        ax_inplane.plot(quad_domain_I.theta, -e_I)
+        ax_inplane.plot(quad_domain_I.theta, -phi_I)
         if correct_ea is not None:
-            ax_inplane.plot([np.rad2deg(correct_ea[2]), np.rad2deg(correct_ea[2])], [-e_I.max(), -e_I.min()], 'r')
+            ax_inplane.plot([np.rad2deg(correct_ea[2]), np.rad2deg(correct_ea[2])], [-phi_I.max(), -phi_I.min()], 'r')
         if 'potential_I' in locals():
             for i, th in enumerate(potential_I):
-                ax_inplane.text(np.rad2deg(th), (-e_I)[sorted_indices_I[i]], str(i))
-        ax_inplane.set_ylim([(-e_I).min(), (-e_I).max()])
+                ax_inplane.text(np.rad2deg(th), (-phi_I)[sorted_indices_I[i]], str(i))
+        ax_inplane.set_ylim([(-phi_I).min(), (-phi_I).max()])
         ax_inplane.set_yticklabels([])
-        ax_inplane.set_title('inplane distribution for likelihood')
+        ax_inplane.set_title('inplane distribution for likelihood\nmax:{0:.2f}, min:{1:.2f}'.format(
+            (-phi_I).max(), (-phi_I).min())
+        )
         ax_inplane.grid(True)
         
         plt.show()
@@ -545,9 +601,9 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
     if density_totalmass is not None:
         model *= density_totalmass / model.sum()
 
-    data_params = {'num_images': 50, 'pixel_size': 2.8,
+    data_params = {'num_images': 200, 'pixel_size': 2.8,
                    'sigma_noise': 25.0,
-                   'symmetry': 'C7',
+                   # 'symmetry': 'C7',
                    'euler_angles': None}
     if add_ctf:
         ctf_params = {'akv': 200, 'wgh': 0.07, 'cs': 2.0, 'psize': 2.8, 'dscale': 1, 'bfactor': 500.0,
@@ -556,20 +612,19 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
         ctf_params = None
     cryodata = SimpleDataset(model, data_params, ctf_params)
 
-    cparams = {'max_frequency': 0.02, 'learn_like_envelope_bfactor': 500}
+    cparams = {'max_frequency': 0.04, 'learn_like_envelope_bfactor': 500}
     print("Using angular correlation patterns:", use_angular_correlation)
     sk = SimpleKernel(cryodata, use_angular_correlation=use_angular_correlation)
     sk.set_data(refined_model, cparams)
 
-    if sk.use_angular_correlation:
-        lognorm = True
-    else:
-        lognorm = False
-
     for i in range(data_params['num_images']):
+        tic = time.time()
         workspace = sk.worker(i)
+        print("idx: {}, time per worker: {}".format(i, time.time()-tic))
         sk.plot_distribution(workspace, sk.quad_domain_R, sk.quad_domain_I,
-                             correct_ea=cryodata.euler_angles[i], lognorm=lognorm)
+                             correct_ea=cryodata.euler_angles[i], lognorm=False)
+
+    # sk.plot_rmsd()
 
 
 def noise_estimate(model, refined_model, add_ctf=True):
@@ -669,12 +724,10 @@ if __name__ == '__main__':
     print("Loading 3D density: %s" % model_file)
     print("Loading refined 3D density: %s" % refined_model_file)
 
-    model = mrc.readMRC(model_file)
-    refined_model = mrc.readMRC(refined_model_file)
-    
-    # noise_estimate(model, refined_model)
+    data_dir = 'data/1AON_no_shifts_200'
+    kernel = kernel_test(data_dir, model_file)
 
-    # data_dir = 'data/1AON_no_shifts_200'
-    # kernel = kernel_test(data_dir, model_file)
-    
-    likelihood_estimate(model, refined_model, True)
+    # model = mrc.readMRC(model_file)
+    # refined_model = mrc.readMRC(refined_model_file)
+    # # noise_estimate(model, refined_model)
+    # likelihood_estimate(model, refined_model, use_angular_correlation=True)

@@ -126,13 +126,13 @@ def ctf_correlation_benchmark(N=128):
     TtoF = FtoT.T
 
     corr_ctf_map = TtoF.dot(calc_angular_correlation(
-        FtoT.dot(ctf_map.flatten()), N=N, rad=rad
+        FtoT.dot(ctf_map.flatten()), N=N, rad=rad, pixel_size=psz
         )).reshape(N, N)
 
     corr_ctf_rots = np.zeros_like(ctf_rots, dtype=ctf_rots.dtype)
     for i, curr_ctf in enumerate(ctf_rots):
         corr_ctf_rots[i] = TtoF.dot(calc_angular_correlation(
-            FtoT.dot(curr_ctf.flatten()), N=N, rad=rad
+            FtoT.dot(curr_ctf.flatten()), N=N, rad=rad, pixel_size=psz
             )).reshape(N, N)
     
     difference = calc_difference(ctf_map, ctf_rots, only_real=True)
