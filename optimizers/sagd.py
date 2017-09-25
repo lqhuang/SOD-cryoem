@@ -76,7 +76,7 @@ def find_L(x, f, dfdx, evalobj, L, maxIts=None,
     invLVals = []
     condVals = []
     invLDVals = [0]
-    condDVals = [0.5 * gnorm2]
+    condDVals = [1.000 * gnorm2]
     its = 0
     while maxIts == None or its < maxIts:
         its += 1
@@ -134,8 +134,8 @@ def find_L(x, f, dfdx, evalobj, L, maxIts=None,
 
         xp = x - (gstep.reshape(x.shape) / currL)
         fp, _ = evalobj(xp, compute_gradient=False, intermediate=True)
-        condVal = (f - 0.5 * gnorm2 / currL) - fp
-        relCondVal = (f - fp) / (0.5 * gnorm2 / currL)
+        condVal = (f - 1.000 * gnorm2 / currL) - fp
+        relCondVal = (f - fp) / (1.000 * gnorm2 / currL)
         good = condVal >= 0
 
         # Only keep the most recent evaluations
@@ -143,7 +143,7 @@ def find_L(x, f, dfdx, evalobj, L, maxIts=None,
             invLVals.pop(0)
             condVals.pop(0)
         invLVals.append(1.0 / currL)
-        condVals.append(f - fp - 0.5 * gnorm2 / currL)
+        condVals.append(f - fp - 1.000 * gnorm2 / currL)
 
         eps = gnorm / currL
         if ostream != None:
@@ -166,7 +166,7 @@ def find_L(x, f, dfdx, evalobj, L, maxIts=None,
             badL = currL
             badfp = fp
 
-            if 0.5 * gnorm2 / L < 1e-8:
+            if 1.000 * gnorm2 / L < 1e-8:
                 break
 
     if goodL != None:
@@ -183,8 +183,8 @@ def find_L(x, f, dfdx, evalobj, L, maxIts=None,
         solnType = 'init'
 
     if ostream != None:
-        ostream("Found {4} L = {0} (f - fp = {2}, 0.5*gnorm2/L = {3}) after {1} its".format(
-            finalL, its, f - finalfp, 0.5 * gnorm2 / finalL, solnType))
+        ostream("Found {4} L = {0} (f - fp = {2}, 1.000*gnorm2/L = {3}) after {1} its".format(
+            finalL, its, f - finalfp, 1.000 * gnorm2 / finalL, solnType))
 
     return finalL
 

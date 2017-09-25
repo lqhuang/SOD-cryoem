@@ -145,7 +145,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['sigma2_R'] = np.empty((N_R,N_T), dtype=np.float64)
         workspace['correlation_R'] = np.empty((N_R,N_T), dtype=np.float64)
         workspace['power_R'] = np.empty((N_R,N_T), dtype=np.float64)
-        workspace['g_R'] = np.empty((N_R,N_T), dtype=np.complex64)
+        workspace['g_R'] = np.empty((N_R,N_T), dtype=np.float32)
         if workspace['N_R'] < N_R:
             workspace['e_R'] = np.empty((N_R,), dtype=np.float64)
             workspace['avgphi_R'] = np.empty((N_R,), dtype=np.float64)
@@ -572,22 +572,24 @@ def doimage_ACRI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices 
     cprojs = ac_slices  # ctf has been mulplied outside.
     cdata = np.tile(ac_data, (N_R, 1))
     # compute the error at each frequency
-    correlation_R[:] = cprojs.real * cdata.real + cprojs.imag * cdata.imag
-    power_R[:] = cprojs.real ** 2 + cprojs.imag ** 2
+    correlation_R[:] = cprojs.real * cdata.real
+    power_R[:] = cprojs.real ** 2
 
     # envelope has been calculated outside
     g_R[:] = np.tile(envelope, (N_R, 1)) * cprojs - cdata
 
     # compute the log likelihood
-    sigma2_R[:] = g_R.real ** 2 + g_R.imag ** 2
+    sigma2_R[:] = g_R[:] ** 2.0
     if use_whitenoise:
         tmp = sigma2_R
     else:
         tmp = sigma2_R / tiled_sigma2_coloured
-    
-    e_R[:] = div_in * tmp.sum(axis=1) + logW_R[:]
+
+    ac_div_in = 1.0 / 0.5
+    e_R[:] = ac_div_in * div_in * tmp.sum(axis=1) + logW_R[:]
     etmp = my_logsumexp(N_R, e_R)
     lse_in = -etmp
+    assert lse_in >= 0
 
     # compute the gradient
     argmax_W_I = logW_I.argmax()
@@ -633,7 +635,7 @@ def doimage_ACRI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices 
             tmp = sigma2_I
         else:
             tmp = sigma2_I / tiled_sigma2_coloured
-        e_I[:] = div_in * tmp.sum(axis=1) + logW_I[:]
+        e_I[:] = div_in * tmp.sum(axis=1) + logW_I[:] + avgphi_R[r]
 
         # compute the gradient
         if computerGrad:
@@ -641,14 +643,16 @@ def doimage_ACRI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices 
 
         etmp = my_logsumexp(N_I, e_I)
 
-        lse_in = -my_logaddexp(-lse_in, etmp)
-    
+        lse_in = lse_in + (-etmp)
+        assert lse_in >= 0.0
+
         # Noise estimate
         # sigma2_R[r].fill(0.0)
         # correlation_R[r].fill(0.0)
         # power_R[r].fill(0.0)
 
-        tmp = logW_R[r]
+        # tmp = avgphi_R[r]
+        tmp = 0.0  # has add logW_R into etmp
         phitmp = np.exp(e_I - etmp)
         tiled_phitmp = np.tile(phitmp, (N_T, 1)).T
         avgphi_I[:] = np.asarray([my_logaddexp(avgphi_I[idx], tmp + e_I[idx]) for idx in range(N_I)], dtype=np.float64)
@@ -657,7 +661,7 @@ def doimage_ACRI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices 
         # sigma2_I[:] = (tiled_phitmp * sigma2_I).sum(axis=0)
 
         if computerGrad:
-            g[r] = g[r] + (tiled_phitmp * g_I).sum(axis=0)
+            g[r] = g[r] + np.exp(avgphi_R[r]) * (tiled_phitmp * g_I).sum(axis=0)
 
     ei = my_logsumexp(N_I, avgphi_I)
     avgphi_I[:] = avgphi_I[:] - ei
@@ -691,10 +695,10 @@ def doimage_ACRI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices 
             # else:
             #     nttmp[:] = tmp
 
-        tiled_phitmp = np.tile(np.exp(avgphi_R), (N_T, 1)).T
+        # tiled_phitmp = np.tile(np.exp(avgphi_R), (N_T, 1)).T
         if use_envelope or not use_whitenoise:
-            g[:] = tiled_phitmp * np.tile(nttmp, (N_R, 1)) * g[:]
+            g[:] = np.tile(nttmp, (N_R, 1)) * g[:]
         else:
-            g[:] = tiled_phitmp * -2.0 * div_in * g[:]
+            g[:] = -2.0 * div_in * g[:]
 
     return lse_in, (avgphi_I[:N_I], avgphi_R[:N_R]), sigma2_est, correlation, power, workspace

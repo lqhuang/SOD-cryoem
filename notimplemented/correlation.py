@@ -152,7 +152,7 @@ def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
     return c, truncc, trunkmask
 
 
-def calc_angular_correlation(trunc_slices, N, rad, pixel_size=None, interpolation='nearest',
+def calc_angular_correlation(trunc_slices, N, rad, pixel_size=1.0, interpolation='nearest',
                              sort_theta=True, clip=True, outside=False,):
     """compute angular correlation for input array
     outside: True or False (default: False)
@@ -225,27 +225,34 @@ def calc_angular_correlation(trunc_slices, N, rad, pixel_size=None, interpolatio
     if np.any(np.isinf(angular_correlation)):
         warnings.warn("Some values in angular correlation occur inf. These values have been set to zeros.")
         angular_correlation.real[np.isinf(angular_correlation.real)] = 0
-        angular_correlation.imag[np.isinf(angular_correlation.imag)] = 0
+        if iscomplex:
+            angular_correlation.imag[np.isinf(angular_correlation.imag)] = 0
     if np.any(np.isnan(angular_correlation)):
         warnings.warn("Some values in angular correlation occur inf. These values have been set to zeros.")
         angular_correlation.real[np.isnan(angular_correlation.real)] = 0
-        angular_correlation.imag[np.isnan(angular_correlation.imag)] = 0
+        if iscomplex:
+            angular_correlation.imag[np.isnan(angular_correlation.imag)] = 0
 
     # 4.
     if clip:
-        factor = 3
+        factor = 3.0
         for i, count in enumerate(unique_counts):
             minimum_sample_points = (4 / count) / resolution
             if count <  minimum_sample_points:
                 pass
             else:
                 indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
-                mean = angular_correlation[indices].mean(axis)
-                std = angular_correlation[indices].std(axis)
-                vmin = mean - std * factor
-                vmax = mean + std * factor
-                # angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
-                angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
+                mean = np.tile(angular_correlation[indices].mean(axis), (count, 1)).T
+                std = np.tile(angular_correlation[indices].std(axis), (count, 1)).T
+
+                assert np.all((std - 0.0) > 1e-16), "Overflow"
+                angular_correlation[indices] = (angular_correlation[indices] - mean) / std
+
+                vmin = -factor
+                vmax = +factor
+                angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
+                # angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
+
 
     # 5.
     corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)

@@ -236,6 +236,7 @@ class UnknownRSKernel:
         self.otf_thresh_RI = params.get('otf_thresh_RI',60000)
         self.otf_thresh_R = params.get('otf_thresh_R',5000)
         self.otf_thresh_I = params.get('otf_thresh_I',500)
+        self.ostream = ostream
         self.fspace_premult_stack_caching = params.get('interp_cache_fspace', True)
         
     def set_dataset(self,cryodata):
@@ -589,6 +590,10 @@ class UnknownRSKernel:
         self.trunc_freq = np.require(self.trunc_xy / (self.N*psize), dtype=np.float32) 
         self.N_T = self.trunc_xy.shape[0]
 
+        self.use_angular_correlation = cparams.get('use_angular_correlation', True)
+        if self.ostream is not None:
+            self.ostream("\nUsing angular correlation: {0}".format(self.use_angular_correlation))
+
         interp_change = self.rad != rad or self.factoredRI != factoredRI
         if interp_change:
             print("Iteration {0}: freq = {3}, rad = {1}, N_T = {2}".format(cparams['iteration'], rad, self.N_T, max_freq))
@@ -893,7 +898,7 @@ class UnknownRSKernel:
                              * np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
                              * slices_sampled
 
-        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, psize)
-        ac_data = correlation.calc_angular_correlation(rotd_sampled[argmax_W_I], self.N, self.rad, psize)
+        ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, psize)
+        ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[argmax_W_I]), self.N, self.rad, psize)
         
         return ac_slices, ac_data

@@ -20,7 +20,7 @@ import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"in
 from . import objective_kernels
 
 from objectives.likelihood import UnknownRSKernel
-
+from notimplemented import py_objective_kernels
 
 class UnknownRSThreadedCPUKernel(UnknownRSKernel):
     def __init__(self):
@@ -131,8 +131,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 res['kern_timing']['prep'][idx] = time.time() - tic
 
                 # get angular correlation slices
-                use_angular_correlation = True
-                if use_angular_correlation:
+                if self.use_angular_correlation:
                     tic = time.time()
                     ac_slices_sampled, ac_data_sampled = self.get_angular_correlation(
                         slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I_sampled)
@@ -158,9 +157,9 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                                                 log_W_S, log_W_I, log_W_R, \
                                                 sigma2, g, workspace )
                 else:
-                    if use_angular_correlation:
+                    if self.use_angular_correlation:
                         like[idx], (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                            objective_kernels.doimage_ACRI(slices_sampled, envelope, \
+                            py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                                 rotc_sampled, rotd_sampled, \
                                 ac_slices_sampled, ac_data_sampled, \
                                 log_W_I, log_W_R, \
