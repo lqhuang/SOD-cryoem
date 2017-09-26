@@ -4,7 +4,11 @@ import numpy as np
 
 
 def my_logsumexp(N , a):
-    # unsigned int N, double *a:
+    """
+    return log(sum_i(exp(a_i)))
+    unsigned int N, double *a:
+    https://en.wikipedia.org/wiki/LogSumExp
+    """
     a_max = a[0]
     for i in range(N):
         if a[i] > a_max:
@@ -18,8 +22,11 @@ def my_logsumexp(N , a):
 
 
 def my_logaddexp(a, b):
-    # log a + log b
-    # double a, double b
+    """
+    return: log(exp(a) + exp(b))
+    double a, double b
+    https://en.wikipedia.org/wiki/Log_probability
+    """
     if a == b:
         return a + 0.69314718055994529 # This is the numerical value of ln(2)
     else:
@@ -138,7 +145,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['sigma2_R'] = np.empty((N_R,N_T), dtype=np.float64)
         workspace['correlation_R'] = np.empty((N_R,N_T), dtype=np.float64)
         workspace['power_R'] = np.empty((N_R,N_T), dtype=np.float64)
-        workspace['g_R'] = np.empty((N_R,N_T), dtype=np.complex64)
+        workspace['g_R'] = np.empty((N_R,N_T), dtype=np.float32)
         if workspace['N_R'] < N_R:
             workspace['e_R'] = np.empty((N_R,), dtype=np.float64)
             workspace['avgphi_R'] = np.empty((N_R,), dtype=np.float64)
@@ -149,7 +156,6 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['correlation_I'] = np.empty((N_I, N_T), dtype=np.float64)
         workspace['power_I'] = np.empty((N_I, N_T), dtype=np.float64)
         workspace['g_I'] = np.empty((N_I,N_T), dtype=np.complex64)
-        workspace['e_ac_I'] = np.empty((1,), dtype=np.float64)
         if workspace['N_I'] < N_I:
             workspace['e_I'] = np.empty((N_I,), dtype=np.float64)
             workspace['avgphi_I'] = np.empty((N_I,), dtype=np.float64)
@@ -439,9 +445,9 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
         e_R[r] = etmp + logW_R[r]
     
         # Noise estimate
-        sigma2_R.fill(0.0)
-        correlation_R.fill(0.0)
-        power_R.fill(0.0)
+        sigma2_R[r].fill(0.0)
+        correlation_R[r].fill(0.0)
+        power_R[r].fill(0.0)
 
         tmp = logW_R[r]
         phitmp = np.exp(e_I - etmp)
