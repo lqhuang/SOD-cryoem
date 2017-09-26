@@ -637,8 +637,8 @@ class CryoOptimizer(BackgroundWorker):
             self.obj.ws[1] = 1.0/sym.get_order()
 
         tic_mstats = time.time()
-        self.ostream(self.cparams['name']," Iteration:", self.iteration,\
-                     " Epoch:", epoch, " Host:", socket.gethostname())
+        self.ostream(self.cparams['name'], " Iteration: %d" % self.iteration, \
+                     " Epoch: %d" % epoch, " Host: %s" % socket.gethostname())
 
         # Compute density statistics
         N = self.cryodata.N

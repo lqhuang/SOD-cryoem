@@ -39,7 +39,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
 
     N = M.shape[0]
     rad = 0.95
-    shift_sigma = 3.0
+    shift_sigma = 0.0
     sigma_noise = 25.0
     M_totalmass = 80000
     kernel = 'lanczos'
@@ -101,7 +101,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         psi = 2 * np.pi * np.random.rand()
         EA = geometry.genEA(pt)[0]
         EA[2] = psi
-        shift = np.random.randn(2) * 0
+        shift = np.random.randn(2) * shift_sigma
 
         R = geometry.rotmat3D_EA(*EA)[:, 0:2]
         slop = cryoops.compute_projection_matrix(

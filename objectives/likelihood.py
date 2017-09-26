@@ -435,7 +435,7 @@ class UnknownRSKernel:
 
         if domain_change_R or interp_change_R:
             symorder = 1 if self.slice_quad['symop'] is None else self.slice_quad['symop'].get_order()
-            print("  Slice Ops: %d, " % self.N_R); sys.stdout.flush()
+            print("  Slice Ops: %d, " % self.N_R, end=''); sys.stdout.flush()
             if self.N_R*symorder < self.otf_thresh_R:
                 self.using_precomp_slicing = True
                 print("generated in", end=''); sys.stdout.flush()
@@ -509,7 +509,7 @@ class UnknownRSKernel:
             self.inplane_params = inplane_params
 
         if domain_change_I or interp_change_I:
-            print("  Inplane Ops: %d, " % self.N_I); sys.stdout.flush()
+            print("  Inplane Ops: %d, " % self.N_I, end=''); sys.stdout.flush()
             if self.N_I < self.otf_thresh_I:
                 self.using_precomp_inplane = True
                 print("generated in", end=''); sys.stdout.flush()
