@@ -37,6 +37,10 @@ def compute_statistics(x, pdf_func):
         mu = x.mean()
         sigma = x.std()
         return mu, sigma
+    if pdf_func is complex_gaussian:
+        mu = x.mean()
+        sigma = x.std()
+        return mu, sigma
     elif pdf_func is chisquare_pdf:
         df = 2
         return (df, )
@@ -45,6 +49,8 @@ def compute_statistics(x, pdf_func):
 
 def get_stat_str(pdf_func, *args):
     if pdf_func is std_gaussian:
+        return 'mu:{:.3f}, sigma:{:.3f}'.format(*args)
+    elif pdf_func is complex_gaussian:
         return 'mu:{:.3f}, sigma:{:.3f}'.format(*args)
     elif pdf_func is chisquare_pdf:
         return 'df:{}'.format(*args)
@@ -97,7 +103,7 @@ def plot_noise_histogram(real_image, fourier_image, rmask=None, fmask=None, plot
     subplot(ax[:, 2], fourier_image.real, fmask, 'real part')
     subplot(ax[:, 3], fourier_image.imag, fmask, 'imaginary part')
     fig.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 def plot_stack_noise(real, fourier):
@@ -115,10 +121,10 @@ def plot_stack_noise(real, fourier):
     subplot(ax[2], fourier.real, 'real part')
     subplot(ax[3], fourier.imag, 'imaginary part')
     fig.tight_layout()
-    plt.show()
+    # plt.show()
 
 
-def no_correlation(num_images=1000, N=128, rad=0.8):
+def no_correlation(num_images=1000, N=128, rad=0.8, stack_noise=False):
     center = int(N/2)
     x_shift, y_shift = np.random.randint(-center, center, size=2)
 
@@ -132,7 +138,9 @@ def no_correlation(num_images=1000, N=128, rad=0.8):
 
     _, _, mask = geometry.gencoords(N, 2, rad, True)
     plot_noise_histogram(real_image, fourier_noise, rmask=mask, fmask=mask)
-    plot_stack_noise(noise_zoom, fourier_noise_zoom)
+    
+    if stack_noise:
+        plot_stack_noise(noise_zoom, fourier_noise_zoom)
 
 
 def correlation_noise(num_images=1000, N=128, rad=0.6, stack_noise=False):
@@ -140,7 +148,7 @@ def correlation_noise(num_images=1000, N=128, rad=0.6, stack_noise=False):
     real_image = noise_stack[np.random.randint(num_images)]
     corr_real_image = correlation.calc_full_ac(real_image, rad=rad)
     fourier_noise = density.real_to_fspace(real_image)
-    fourier_corr_image = correlation.calc_full_ac(fourier_noise, rad=rad)
+    fourier_corr_image = correlation.calc_full_ac(np.abs(fourier_noise), rad=rad)
 
     _, _, mask = geometry.gencoords(N, 2, rad, True)
     plot_noise_histogram(corr_real_image, fourier_corr_image, mask, mask)
@@ -163,5 +171,6 @@ def correlation_noise(num_images=1000, N=128, rad=0.6, stack_noise=False):
 
 
 if __name__ == '__main__':
-    no_correlation(N=256)
+    no_correlation(num_images=20, N=256)
     correlation_noise(N=256, rad=0.6)
+    plt.show()

@@ -19,7 +19,7 @@ import geometry
 import density
 import cryoem
 import cryoops
-from objectives.likelihood import UnknownRSKernel
+from objectives.cpu_kernel import UnknownRSThreadedCPUKernel
 from importancesampler.fisher import FixedFisherImportanceSampler
 from importancesampler.gaussian import FixedGaussianImportanceSampler
 from symmetry import get_symmetryop
@@ -92,16 +92,6 @@ def plotwinkeltriple(dirs, values, spot=None, others=None, vmin=None, vmax=None,
 
 
 def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shifts=False):
-    model = mrc.readMRC(model_file)
-    density_totalmass = 80000
-    if density_totalmass is not None:
-        model *= density_totalmass / model.sum()
-
-    N = model.shape[0]
-    premult = cryoops.compute_premultiplier(N=N, kernel='lanczos', kernsize=4)
-    premult = premult.reshape((-1, 1, 1)) * premult.reshape((1, -1, 1)) * premult.reshape((1, 1, -1))
-    fM = density.real_to_fspace(premult * model)
-
     data_params = {
         'dataset_name': "1AON",
         'inpath': os.path.join(data_dir, 'imgdata.mrc'),
@@ -110,14 +100,29 @@ def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shif
         'resolution': 2.8,
         'sigma': 'noise_std',
         'sigma_out': 'data_std',
-        'minisize': 150,
+        'minisize': 20,
         'test_imgs': 20,
         'partition': 0,
         'num_partitions': 0,
         'random_seed': 1,
         # 'symmetry': 'C7'
     }
+    print("Loading dataset %s" % data_dir)
     cryodata, _ = dataset_loading_test(data_params)
+    mleDC, _, mleDC_est_std = cryodata.get_dc_estimate()
+    modelscale = (np.abs(mleDC) + 2*mleDC_est_std)/cryodata.N
+
+    if model_file is not None:
+        print("Loading density map %s" % model_file)
+        M = mrc.readMRC(model_file)
+    else:
+        print("Generating random initial density map ...")
+        M = cryoem.generate_phantom_density(cryodata.N, 0.95 * cryodata.N / 2.0, \
+                                            5 * cryodata.N / 128.0, 30, seed=0)
+        M *= modelscale/M.sum()
+    slice_interp = {'kern': 'lanczos', 'kernsize': 4, 'zeropad': 0, 'dopremult': True}
+    fM = SimpleKernel.get_fft(M, slice_interp)
+
     minibatch = cryodata.get_next_minibatch(shuffle_minibatches=False)
 
     is_sym = get_symmetryop(data_params.get('symmetry',None))
@@ -128,7 +133,13 @@ def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shif
     else:
         sampler_S = None
 
-    cparams = {'iteration': 0,'pixel_size': cryodata.pixel_size, 'max_frequency': 0.02,
+    cparams = {
+        'use_angular_correlation': use_angular_correlation,
+
+        'iteration': 0,
+        'pixel_size': cryodata.pixel_size,
+        'max_frequency': 0.02,
+
         'interp_kernel_R': 'lanczos',
         'interp_kernel_size_R':	4,
         'interp_zeropad_R':	0,
@@ -145,7 +156,7 @@ def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shif
         'sigma': cryodata.noise_var,
         # 'symmetry': 'C7'
     }
-    kernel = UnknownRSKernel()
+    kernel = UnknownRSThreadedCPUKernel()
     kernel.setup(cparams, None, None, None)
     kernel.set_samplers(sampler_R, sampler_I, sampler_S)
     kernel.set_dataset(cryodata)
@@ -153,21 +164,24 @@ def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shif
     kernel.set_data(cparams, minibatch)
     kernel.using_precomp_slicing = False
     kernel.using_precomp_inplane = False
+    kernel.M = M
     kernel.fM = fM
-    kernel.use_angular_correlation = use_angular_correlation
     return kernel
 
 
-def kernel_test(data_dir, model_file, use_angular_correlation=True):
+def kernel_test(data_dir, model_file, use_angular_correlation=False):
     kernel = load_kernel(data_dir, model_file, use_angular_correlation)
 
     euler_angles = []
     with open(os.path.join(data_dir, 'ctf_gt.par')) as par:
         par.readline()
         # 'C                 PHI      THETA        PSI        SHX        SHY       FILM        DF1        DF2     ANGAST'
-        for i in range(200):
-            line = par.readline().split()
-            euler_angles.append([float(line[1]), float(line[2]), float(line[3])])
+        while True:
+            try:
+                line = par.readline().split()
+                euler_angles.append([float(line[1]), float(line[2]), float(line[3])])
+            except:
+                break
     euler_angles = np.asarray(euler_angles)
 
     for idx in range(kernel.minibatch['N_M']):
@@ -202,7 +216,7 @@ def kernel_test(data_dir, model_file, use_angular_correlation=True):
 
         if kernel.use_angular_correlation:
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                objective_kernels.doimage_ACRI(slices_sampled, envelope, \
+                py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                     rotc_sampled, rotd_sampled, \
                     ac_slices_sampled, ac_data_sampled, \
                     log_W_I, log_W_R, \
@@ -268,8 +282,8 @@ class SimpleKernel():
         else:
             slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
         
-        ac_slices = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, self.psize)
-        ac_data = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad, self.psize)
+        ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, self.psize)
+        ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[0]), self.N, self.rad, self.psize)
         
         return ac_slices, ac_data
 
@@ -480,6 +494,17 @@ class SimpleKernel():
         workspace['like'] = like
         workspace['cphi_I'] = cphi_I
         workspace['cphi_R'] = cphi_R
+        
+        g = np.zeros(g_size, dtype=self.G_datatype)
+
+        like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, _ = \
+            objective_kernels.doimage_RI(slices_sampled, envelope, \
+                rotc_sampled, rotd_sampled, \
+                log_W_I, log_W_R, \
+                sigma2, g, None)
+
+        workspace['full_like_cphi_I'] = cphi_I
+        workspace['full_like_cphi_R'] = cphi_R
 
         self.cached_workspace[idx] = workspace
         return workspace
@@ -601,9 +626,23 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
     if density_totalmass is not None:
         model *= density_totalmass / model.sum()
 
+    euler_angles = []
+    data_dir = 'data/1AON_no_shifts_200'
+    with open(os.path.join(data_dir, 'ctf_gt.par')) as par:
+        par.readline()
+        # 'C                 PHI      THETA        PSI        SHX        SHY       FILM        DF1        DF2     ANGAST'
+        while True:
+            try:
+                line = par.readline().split()
+                euler_angles.append([float(line[1]), float(line[2]), float(line[3])])
+            except:
+                break
+    euler_angles = np.asarray(euler_angles)
+
     data_params = {'num_images': 200, 'pixel_size': 2.8,
-                   'sigma_noise': 25.0,
-                   # 'symmetry': 'C7',
+                   'sigma_noise': 5.0,
+                   'euler_angles': euler_angles,
+                   'symmetry': 'C7',
                    'euler_angles': None}
     if add_ctf:
         ctf_params = {'akv': 200, 'wgh': 0.07, 'cs': 2.0, 'psize': 2.8, 'dscale': 1, 'bfactor': 500.0,
@@ -621,6 +660,11 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
         tic = time.time()
         workspace = sk.worker(i)
         print("idx: {}, time per worker: {}".format(i, time.time()-tic))
+        sk.plot_distribution(workspace, sk.quad_domain_R, sk.quad_domain_I,
+                             correct_ea=cryodata.euler_angles[i], lognorm=False)
+
+        workspace['cphi_R'] = workspace['full_like_cphi_R']
+        workspace['cphi_I'] = workspace['full_like_cphi_I']
         sk.plot_distribution(workspace, sk.quad_domain_R, sk.quad_domain_I,
                              correct_ea=cryodata.euler_angles[i], lognorm=False)
 
@@ -724,10 +768,11 @@ if __name__ == '__main__':
     print("Loading 3D density: %s" % model_file)
     print("Loading refined 3D density: %s" % refined_model_file)
 
-    data_dir = 'data/1AON_no_shifts_200'
-    kernel = kernel_test(data_dir, model_file)
+    # data_dir = 'data/1AON_no_shifts_20000'
+    # kernel = kernel_test(data_dir, model_file, use_angular_correlation=True)
 
-    # model = mrc.readMRC(model_file)
-    # refined_model = mrc.readMRC(refined_model_file)
-    # # noise_estimate(model, refined_model)
-    # likelihood_estimate(model, refined_model, use_angular_correlation=True)
+    model = mrc.readMRC(model_file)
+    refined_model = mrc.readMRC(refined_model_file)
+    likelihood_estimate(model, refined_model, use_angular_correlation=True)
+
+    # noise_estimate(model, refined_model)
