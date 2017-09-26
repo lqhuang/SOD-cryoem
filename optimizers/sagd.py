@@ -310,11 +310,12 @@ class SAGDStep(base.BaseStep):
         if do_ls:
             # Perform line search if we haven't found a value of L yet
             # and/or check that the current L satisfies the conditions
-            self.L = find_L(x, f, g, evalobj, L0, max_ls_its,
-                            gradientCheck=grad_check,
-                            ostream=ostream, precond=precond,
-                            minStep=minStep, maxStep=maxStep,
-                            optThresh=optThresh)
+            # self.L = find_L(x, f, g, evalobj, L0, max_ls_its,
+            #                 gradientCheck=grad_check,
+            #                 ostream=ostream, precond=precond,
+            #                 minStep=minStep, maxStep=maxStep,
+            #                 optThresh=optThresh)
+            self.L = 1e-5
 
         currL = self.L
 

@@ -245,11 +245,15 @@ def calc_angular_correlation(trunc_slices, N, rad, pixel_size=1.0, interpolation
                 mean = np.tile(angular_correlation[indices].mean(axis), (count, 1)).T
                 std = np.tile(angular_correlation[indices].std(axis), (count, 1)).T
 
-                assert np.all((std - 0.0) > 1e-16), "Overflow"
-                angular_correlation[indices] = (angular_correlation[indices] - mean) / std
+                if np.all(std < 1e-16):
+                    warnings.warn("Standard deviation all equal to zero")
+                    vmin = mean.mean(axis) - factor * std.mean(axis)
+                    vmax = mean.mean(axis) + factor * std.mean(axis)
+                else:
+                    angular_correlation[indices] = (angular_correlation[indices] - mean) / std
+                    vmin = -factor
+                    vmax = +factor
 
-                vmin = -factor
-                vmax = +factor
                 angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
                 # angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
 

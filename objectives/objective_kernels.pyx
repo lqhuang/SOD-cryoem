@@ -717,8 +717,8 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
                  n.ndarray[n.float32_t, ndim=1] envelope, # (Experimental) envelope (N_T)
                  n.ndarray[n.float32_t, ndim=2] ctf, # CTF operators (rotated) (N_I x N_T)
                  n.ndarray[n.complex64_t, ndim=2] d, # Image data (rotated) (N_I x N_T)
-                 n.ndarray[n.complex64_t, ndim=2] ac_slices, # Angular correlation slices of 3D volume (N_R x N_T)
-                 n.ndarray[n.complex64_t, ndim=1] ac_d, # Image data (1 x N_T)
+                 n.ndarray[n.float32_t, ndim=2] ac_slices, # Angular correlation slices of 3D volume (N_R x N_T)
+                 n.ndarray[n.float32_t, ndim=1] ac_d, # Image data (1 x N_T)
                  # n.ndarray[n.float32_t, ndim=1] logW_S, # Shift weights
                  n.ndarray[n.float32_t, ndim=1] logW_I, # Inplane weights
                  n.ndarray[n.float32_t, ndim=1] logW_R, # Slice weights
@@ -775,6 +775,7 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
 
     # cdef n.float64_t e, ei, er, es, div_in, lse_in, tmp, phitmp, etmp
     cdef n.float64_t e, ei, er, div_in, lse_in, tmp, phitmp, etmp, e_I_tmp
+    cdef n.float64_t ac_div_in = 1.0 / 0.5
     cdef n.complex128_t cproj, cim
     
     cdef n.float64_t sigma2_white
@@ -835,13 +836,13 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
             tmp = 0
             if use_whitenoise:
                 for t in xrange(N_T):
-                    sigma2_R[r,t] = g_R[r,t].real**2 + g_R[r,t].imag**2
+                    sigma2_R[r,t] = g_R[r,t].real**2
                     tmp += sigma2_R[r,t]
             else:
                 for t in xrange(N_T):
-                    sigma2_R[r,t] = g_R[r,t].real**2 + g_R[r,t].imag**2
+                    sigma2_R[r,t] = g_R[r,t].real**2
                     tmp += sigma2_R[r,t] / sigma2_coloured[t]
-            e_R[r] = div_in * tmp + logW_R[r]
+            e_R[r] = ac_div_in * div_in * tmp + logW_R[r]
 
             # Compute the gradient
             if computeGrad:
@@ -899,7 +900,7 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
                     for t in xrange(N_T):
                         sigma2_I[i,t] = g_I[i,t].real**2 + g_I[i,t].imag**2
                         tmp += sigma2_I[i,t] / sigma2_coloured[t]
-                e_I[i] = div_in*tmp + logW_I[i]
+                e_I[i] = div_in*tmp + logW_I[i] + avgphi_R[r]
 
                 # Compute the gradient
                 if computeGrad:
@@ -907,7 +908,7 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
                         g_I[i,t] = ctf[i,t]*g_I[i,t]
 
             etmp = my_logsumexp(N_I, <double*>e_I.data)
-            lse_in = -my_logaddexp(-lse_in, etmp)
+            lse_in = lse_in + (-etmp)
 
             # Noise estimate
             # sigma2_R[r,t], correlation_R[r,t], power_R[r,t]
@@ -917,7 +918,8 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
                 # correlation_R[r,t] = 0
                 # power_R[r,t] = 0
 
-            tmp = logW_R[r]
+            # tmp = logW_R[r]
+            tmp = 0.0 # has add logW_R into etmp
             for i in xrange(N_I):
                 phitmp = exp(e_I[i] - etmp)
                 avgphi_I[i] = my_logaddexp(avgphi_I[i], tmp + e_I[i])
@@ -929,7 +931,7 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
 
                 if computeGrad:
                     for t in xrange(N_T):
-                        g[r, t] = g[r, t] + phitmp * g_I[i, t]
+                        g[r, t] = g[r, t] + exp(avgphi_R[r]) * phitmp * g_I[i, t]
 
         ei = my_logsumexp(N_I, <double*>avgphi_I.data)
         for i in xrange(N_I):
@@ -977,13 +979,13 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
             if computeGrad:
                 if use_envelope or not use_whitenoise:
                     for r in xrange(N_R):
-                        phitmp = exp(avgphi_R[r])
+                        # phitmp = exp(avgphi_R[r])
                         for t in xrange(N_T):
-                            g[r,t] = phitmp * nttmp[t] * g[r,t]
+                            g[r,t] = nttmp[t] * g[r,t]
                 else:
                     for r in xrange(N_R):
-                        phitmp = exp(avgphi_R[r])
+                        # phitmp = exp(avgphi_R[r])
                         for t in xrange(N_T):
-                            g[r,t] = phitmp * -2.0 * div_in * g[r,t]
+                            g[r,t] = -2.0 * div_in * g[r,t]
 
     return lse_in, (avgphi_I[:N_I], avgphi_R[:N_R]), sigma2_est, correlation, power, workspace

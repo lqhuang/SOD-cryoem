@@ -159,7 +159,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                 else:
                     if self.use_angular_correlation:
                         like[idx], (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                            py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
+                            objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                                 rotc_sampled, rotd_sampled, \
                                 ac_slices_sampled, ac_data_sampled, \
                                 log_W_I, log_W_R, \
