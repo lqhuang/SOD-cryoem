@@ -793,6 +793,10 @@ def doimage_ACRI(n.ndarray[n.complex64_t, ndim=2] slices, # Slices of 3D volume 
     e_R.fill(-n.inf)
     e_I.fill(-n.inf)
 
+    sigma2_R.fill(0.0)
+    correlation_R.fill(0.0)
+    power_R.fill(0.0)
+
     if use_whitenoise:
         sigma2_white = sigma2
         div_in = -1.0/(2.0*sigma2)
