@@ -18,6 +18,7 @@ from geometry import gencoords
 from cryoem import getslices
 
 from notimplemented import correlation
+from scipy.stats import entropy
 
 
 class UnknownRSLikelihood(Objective):
@@ -897,8 +898,18 @@ class UnknownRSKernel:
             slices_sampled = np.tile(envelope, (N_R, 1)) \
                              * np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
                              * slices_sampled
+        else:
+            slices_sampled = np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
+                             * slices_sampled
 
         ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, psize)
         ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[argmax_W_I]), self.N, self.rad, psize)
-        
-        return ac_slices, ac_data
+
+        # check zeros
+        ac_slices[ac_slices == 0.0] + 1e-16
+        # calculating K-L divergence
+        ac_e_R = entropy(np.tile(ac_data, (N_R, 1)).T, ac_slices.T)  # qk is used to approximate pk, qk
+        ac_indices = ac_e_R.argsort()
+        cutoff = 30
+
+        return ac_indices[0:cutoff]

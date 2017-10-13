@@ -73,7 +73,8 @@ def doimage_test(data_dir, model_file, use_angular_correlation=True):
 
         tic = time.time()
         if kernel.use_angular_correlation:
-            ac_slices_sampled, ac_data_sampled = kernel.get_angular_correlation(
+            # ac_slices_sampled, ac_data_sampled
+            ac_indices = kernel.get_angular_correlation(
                 slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I_sampled)
         print("angular correlation timing:", time.time()-tic)
 
@@ -99,7 +100,8 @@ def doimage_test(data_dir, model_file, use_angular_correlation=True):
                 like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
                     objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                         rotc_sampled, rotd_sampled, \
-                        ac_slices_sampled, ac_data_sampled, \
+                        # ac_slices_sampled, ac_data_sampled, \
+                        ac_indices,
                         log_W_I, log_W_R, \
                         sigma2, g, workspace)
             else:
@@ -146,7 +148,8 @@ def doimage_test(data_dir, model_file, use_angular_correlation=True):
                 like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
                     py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                         rotc_sampled, rotd_sampled, \
-                        ac_slices_sampled, ac_data_sampled, \
+                        # ac_slices_sampled, ac_data_sampled, \
+                        ac_indices,
                         log_W_I, log_W_R, \
                         sigma2, g, workspace)
             else:
