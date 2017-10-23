@@ -31,20 +31,14 @@ import sincint
 def genphantomdata(N_D, phantompath, ctfparfile):
     mscope_params = {'akv': 200, 'wgh': 0.07,
                      'cs': 2.0, 'psize': 2.8, 'bfactor': 500.0}
-    # mscope_params = {'akv': 200, 'wgh': 0.07,
-    #                  'cs': 2.0, 'psize': 3.0, 'bfactor': 500.0}
 
     M = mrc.readMRC(phantompath)
 
     N = M.shape[0]
     rad = 0.95
-    shift_sigma = 0.0
-    sigma_noise = 25.0
-    M_totalmass = 80000
+    M_totalmass = 5000
     kernel = 'lanczos'
     ksize = 6
-
-    premult = cryoops.compute_premultiplier(N, kernel, ksize)
 
     tic = time.time()
 
@@ -53,8 +47,6 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     rad = float(rad)
     psize = mscope_params['psize']
     bfactor = mscope_params['bfactor']
-    shift_sigma = float(shift_sigma)
-    sigma_noise = float(sigma_noise)
     M_totalmass = float(M_totalmass)
 
     srcctf_stack = CTFStack(ctfparfile, mscope_params)
@@ -70,28 +62,45 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     if M_totalmass is not None:
         M *= M_totalmass / M.sum()
 
+    # oversampling
+    zeropad = 1
+    zeropad_size = int(zeropad * (N / 2))
+    zp_N = zeropad_size * 2 + N
+    zpm_shape = (zp_N,) * 3
+    zp_M = np.zeros(zpm_shape, dtype=density.real_t)
+    zpm_slices = (slice( zeropad_size, (N + zeropad_size) ),) * 3
+    zp_M[zpm_slices] = M
+
+    premult = cryoops.compute_premultiplier(zp_N, kernel, ksize)
     V = density.real_to_fspace(
-        premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * M)
+        premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * zp_M)
+    zp_fM = V.real ** 2 + V.imag ** 2
+    fM = zp_fM[zpm_slices]
+
+    # np.save('3D_mask_0.015', mask_3d_outlier)
+    # mrc.writeMRC('particle/1AON_fM_totalmass_{}_oversampling_1.mrc'.format(str(int(M_totalmass))).zfill(5), fM, psz=2.8)
+    # exit()
 
     print("Generating data...")
     sys.stdout.flush()
     imgdata = np.empty((N_D, N, N), dtype=density.real_t)
 
-    pardata = {'R': [], 't': []}
+    pardata = {'R': []}
 
     prevctfI = None
     for i, srcctfI in enumerate(Cmap):
         ellapse_time = time.time() - tic
         remain_time = float(N_D - i) * ellapse_time / max(i, 1)
         print("\r%.2f Percent.. (Elapsed: %s, Remaining: %s)" % (i / float(N_D)
-                                                                 * 100.0, format_timedelta(ellapse_time), format_timedelta(remain_time)))
+                                                                 * 100.0, format_timedelta(ellapse_time), format_timedelta(remain_time)),
+              end='')
         sys.stdout.flush()
 
         # Get the CTF for this image
         cCTF = srcctf_stack.get_ctf(srcctfI)
         if prevctfI != srcctfI:
             genctfI = genctf_stack.add_ctf(cCTF)
-            C = cCTF.dense_ctf(N, psize, bfactor).reshape((N**2,))
+            C = cCTF.dense_ctf(N, psize, bfactor).reshape((N, N))
             prevctfI = srcctfI
 
         # Randomly generate the viewing direction/shift
@@ -100,27 +109,26 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         psi = 2 * np.pi * np.random.rand()
         EA = geometry.genEA(pt)[0]
         EA[2] = psi
-        shift = np.random.randn(2) * shift_sigma
 
         R = geometry.rotmat3D_EA(*EA)[:, 0:2]
         slop = cryoops.compute_projection_matrix(
             [R], N, kernel, ksize, rad, 'rots')
-        S = cryoops.compute_shift_phases(shift.reshape((1, 2)), N, rad)[0]
 
-        D = slop.dot(V.reshape((-1,)))
-        D *= S
+        D = slop.dot(fM.reshape((-1,)))
+        intensity = TtoF.dot(D)
+        np.maximum(intensity, 1e-6, out=intensity)
 
-        imgdata[i] = density.fspace_to_real((C * TtoF.dot(D)).reshape((N, N))) + np.require(
-            np.random.randn(N, N) * sigma_noise, dtype=density.real_t)
+        img = np.float_(np.random.poisson(intensity.reshape(N, N)), dtype=density.real_t)
+        # np.maximum(1.0, img, out=img)
 
+        imgdata[i] = np.require(img * C + 1.0 - C, dtype=density.real_t)
         genctf_stack.add_img(genctfI,
                              PHI=EA[0] * 180.0 / np.pi, THETA=EA[1] * 180.0 / np.pi, PSI=EA[2] * 180.0 / np.pi,
-                             SHX=shift[0], SHY=shift[1])
+                             SHX=0.0, SHY=0.0)
 
         pardata['R'].append(R)
-        pardata['t'].append(shift)
 
-    print("\rDone in ", time.time() - tic, " seconds.")
+    print("\n\rDone in ", time.time() - tic, " seconds.")
     return imgdata, genctf_stack, pardata, mscope_params
 
 
@@ -150,7 +158,7 @@ if __name__ == '__main__':
     mrc.writeMRC(mrc_path, np.transpose(imgdata,(1,2,0)), mscope_params['psize'])
 
     pard_path = os.path.join(outpath,'pardata.pkl')
-    print(os.path.realpath(par_path))
+    print(os.path.realpath(pard_path))
     with open(pard_path,'wb') as fi:
         pickle.dump(pardata, fi, protocol=2)
     print("Done in ", time.time()-tic, " seconds.")

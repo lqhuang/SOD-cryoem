@@ -2,8 +2,11 @@ from .objective import Objective
 
 import numpy as np
 
+import density
+
+
 class NullPrior(Objective):
-    def __init__(self,fspace):
+    def __init__(self,fspace=False):
         Objective.__init__(self,fspace)
 
     def set_params(self,cparams):

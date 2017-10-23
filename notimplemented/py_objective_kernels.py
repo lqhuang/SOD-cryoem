@@ -1,22 +1,33 @@
 from __future__ import print_function, division
 
 import numpy as np
+# from scipy.special import gammaln
 
+# def safe_log(x):
+#     """
+#     numpy log function without nan or inf
+#     return 0 if x<=0
+#     """
+#     logx = np.log(x)
+#     logx[np.isnan(logx) | np.isinf(logx)] = 0.0
+#     return np.require(logx, dtype=x.dtype)
 
-def my_logsumexp(N , a):
+# def my_gammaln(k):
+#     return gammaln(k+1)
+
+def my_logsumexp(N, a):
     """
     return log(sum_i(exp(a_i)))
     unsigned int N, double *a:
     https://en.wikipedia.org/wiki/LogSumExp
     """
-    a_max = a[0]
-    for i in range(N):
-        if a[i] > a_max:
-            a_max = a[i]
-
+    a_max = a.max()
     a_sum = 0
     for i in range(N):
-        a_sum += np.exp(a[i] - a_max)
+        if a[i] - a_max > -72.0:  # np.exp(-72.0) = 5.3801861600211382e-32
+            a_sum += np.exp(a[i] - a_max)
+        else:
+            pass
 
     return a_max + np.log(a_sum)
 
@@ -33,9 +44,15 @@ def my_logaddexp(a, b):
         tmp = a-b
         
         if tmp > 0:
-            return a + np.log1p(np.exp(-tmp))
+            if tmp > 72.0:
+                return a
+            else:
+                return a + np.log1p(np.exp(-tmp))
         elif tmp <= 0:
-            return b + np.log1p(np.exp(tmp))
+            if tmp < -72.0:
+                return b
+            else:
+                return b + np.log1p(np.exp(tmp))
         else:
             return tmp
 
@@ -46,7 +63,7 @@ def check(slices, shifts, envelope,
           sigma2, g):
     # type checking
     if isinstance(slices, np.ndarray):
-        assert slices.dtype == np.complex64
+        assert slices.dtype == np.float32
     else:
         raise TypeError(
             'Wrong type ({}}) for slices. '.format(type(slices)) + 
@@ -72,7 +89,7 @@ def check(slices, shifts, envelope,
             'Wrong type ({}) for ctf. '.format(type(ctf)) +
             'Numpy ndarry with sahpe (N_I, N_T) is expected.')
     if isinstance(data, np.ndarray):
-        assert data.dtype == np.complex64
+        assert data.dtype == np.float32
     else:
         raise TypeError(
             'Wrong type ({}) for data. '.format(type(data)) +
@@ -106,7 +123,7 @@ def check(slices, shifts, envelope,
             'Wrong type ({}) for sigma2. '.format(type(sigma2)) +
             'Scalar or a numpy ndarry with sahpe (N_T,) is expected.')
     if isinstance(g, np.ndarray):
-        assert g.dtype == np.complex64
+        assert g.dtype == np.float32
     elif g is None:
         pass
     else:
@@ -155,21 +172,11 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['sigma2_I'] = np.empty((N_I, N_T), dtype=np.float64)
         workspace['correlation_I'] = np.empty((N_I, N_T), dtype=np.float64)
         workspace['power_I'] = np.empty((N_I, N_T), dtype=np.float64)
-        workspace['g_I'] = np.empty((N_I,N_T), dtype=np.complex64)
+        workspace['g_I'] = np.empty((N_I,N_T), dtype=np.float32)
         if workspace['N_I'] < N_I:
             workspace['e_I'] = np.empty((N_I,), dtype=np.float64)
             workspace['avgphi_I'] = np.empty((N_I,), dtype=np.float64)
         workspace['N_I'] = N_I
-
-    if N_S is not None and (workspace['N_S'] < N_S or workspace['N_T'] != N_T):
-        workspace['sigma2_S'] = np.empty((N_S, N_T), dtype=np.float64)
-        workspace['correlation_S'] = np.empty((N_S, N_T), dtype=np.float64)
-        workspace['power_S'] = np.empty((N_S, N_T), dtype=np.float64)
-        workspace['g_S'] = np.empty((N_S,N_T), dtype=np.complex64)
-        if workspace['N_S'] < N_S:
-            workspace['e_S'] = np.empty((N_S,), dtype=np.float64)
-            workspace['avgphi_S'] = np.empty((N_S,), dtype=np.float64)
-        workspace['N_S'] = N_S
 
     if workspace['N_T'] != N_T:
         workspace['sigma2_est']  = np.zeros((N_T,), dtype=np.float64)
@@ -186,186 +193,14 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
     return workspace
 
 
-def doimage_RIS(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of 3D volume (N_R x N_T)
-                shifts, # np.ndarray[n.complex64_t, ndim=2] S, # Shift operators (N_S X N_T)
-                envelope, # np.ndarray[np.float32_t, ndim=1] envelope,  # (Experimental) envelope (N_T)
-                ctf, # np.ndarray[np.float32_t, ndim=1] ctf,  # CTF operator (rotated) (N_I X N_T)
-                data, # np.ndarray[np.complex64_t, ndim=1] d,  # Image data (rotated) (N_I X N_T)
-                logW_S, # np.ndarray[n.float32_t, ndim=1] logW_S, # Shift weights
-                logW_I, # np.ndarray[np.float32_t, ndim=1] logW_I, # Inplane weights
-                logW_R, # np.ndarray[np.float32_t, ndim=1] logW_R, # Slice weights 
-                sigma2, # Inlier noise, can be a scalar or an N_T length vector
-                g, # np.ndarray[np.complex64_t, ndim=2] g, # Where to store gradient output
-                workspace):
-    # type checking and size checking
-    N_R, N_I, N_S, N_T = check(slices, shifts, envelope, ctf, data,
-                               logW_S, logW_I, logW_R, sigma2, g)
-
-    # update working space
-    workspace = update_workspace(workspace, N_R, N_I, N_S, N_T)
-    g_I = workspace['g_I']
-    g_S = workspace['g_S']
-
-    e_R = workspace['e_R']
-    sigma2_R = workspace['sigma2_R']
-    correlation_R = workspace['correlation_R']
-    power_R = workspace['power_R']
-    avgphi_R = workspace['avgphi_R']
-
-    e_I = workspace['e_I']
-    sigma2_I = workspace['sigma2_I']
-    correlation_I = workspace['correlation_I']
-    power_I = workspace['power_I']
-    avgphi_I = workspace['avgphi_I']
-
-    e_S = workspace['e_S']
-    sigma2_S = workspace['sigma2_S']
-    correlation_S = workspace['correlation_S']
-    power_S = workspace['power_S']
-    avgphi_S = workspace['avgphi_S']
-
-    sigma2_est = workspace['sigma2_est']
-    correlation = workspace['correlation']
-    power = workspace['power']
-
-    nttmp = workspace['nttmp']
-
-    # set params
-    use_envelope = envelope is not None
-    use_whitenoise = not isinstance(sigma2, np.ndarray)
-    computerGrad = g is not None
-    avgphi_S.fill(-np.inf)
-    avgphi_I.fill(-np.inf)
-
-    if use_whitenoise:
-        sigma2_white = sigma2
-        div_in = -1.0 / (2.0 * sigma2)
-    else:
-        sigma2_coloured = sigma2
-        assert sigma2_coloured.shape[0] == N_T
-        tiled_sigma2_coloured = np.tile(sigma2_coloured, (N_I, 1))
-        div_in = -0.5
-    
-    if use_envelope:
-        assert envelope.shape[0] == N_T
-        tiled_envelope = np.tile(envelope, (N_I, 1))
-
-    if computerGrad:
-        assert g.shape[0] == N_R
-        assert g.shape[1] == N_T
-
-    # computing
-    for r, cproj in enumerate(slices):
-        for s, curr_shift in enumerate(shifts):
-            cprojs = ctf * np.tile(cproj, (N_I, 1))
-            cimg = np.tile(curr_shift, (N_I, 1)) * data
-            # compute the error at each frequency
-            correlation_I[:] = cprojs.real * data.real + cprojs.imag * cimg.imag
-            power_I[:] = cprojs.real ** 2 + cprojs.imag ** 2
-
-            if use_envelope:
-                g_I[:] = tiled_envelope * cprojs - cimg
-            else:
-                g_I[:] = cprojs - cimg
-        
-            # compute the log likelihood
-            sigma2_I[:] = g_I.real ** 2 + g_I.imag ** 2
-            if use_whitenoise:
-                tmp = sigma2_I
-            else:
-                tmp = sigma2_I / tiled_sigma2_coloured
-            e_I[:] = div_in * tmp.sum(axis=1) + logW_I
-
-            # compute the gradient
-            if computerGrad:
-                g_I[:] = ctf * g_I
-
-            etmp = my_logsumexp(N_I, e_I)
-            e_S[s] = etmp + logW_S[s]
-
-            # Noise estimate
-            correlation_S.fill(0.0)
-            power_S.fill(0.0)
-            sigma2_S.fill(0.0)
-            if computerGrad:
-                g_S.fill(0.0)
-            tmp = logW_S[s] + logW_R[r]
-            phitmp = np.exp(e_I - etmp)
-            tiled_phitmp = np.tile(phitmp, (N_T, 1)).T
-            avgphi_I[:] = np.asarray([my_logaddexp(avgphi_I[i], tmp + e_I[i]) for i in range(N_I)], dtype=np.float64)
-            correlation_S[s] = (tiled_phitmp * correlation_I).sum(axis=0)
-            power_S[s] = (tiled_phitmp * power_I).sum(axis=0)
-            sigma2_S[s] = (tiled_phitmp * sigma2_I).sum(axis=0)
-
-            if computerGrad:
-                g[s] = g[s] + (tiled_phitmp * g_I).sum(axis=0)
-            
-        etmp = my_logsumexp(N_S, e_S)
-        e_R[r] = etmp + logW_R[r]
-
-        # Noise estimate
-        sigma2_R.fill(0)
-        correlation_R.fill(0)
-        power_R.fill(0)
-        tmp = logW_R[r]
-        phitmp = np.exp(e_S - etmp)
-        tiled_phitmp = np.tile(phitmp, (N_T, 1)).T
-        avgphi_S[:] = np.asarray([my_logaddexp(avgphi_S[s], tmp + e_S[s]) for s in range(N_S)], dtype=np.float64)
-        correlation_R[r] = (tiled_phitmp * correlation_S).sum(axis=0)
-        power_R[r] = (tiled_phitmp * power_S).sum(axis=0)
-        sigma2_R[r] = (tiled_phitmp * sigma2_S).sum(axis=0)
-
-        if computerGrad:
-            g[r] = g[r] + (tiled_phitmp * g_S).sum(axis=0)
-    
-    e = my_logsumexp(N_R, e_R)
-    lse_in = -e
-
-    if computerGrad:
-        tmp = -2.0 * div_in
-        if not use_whitenoise:
-            if use_envelope:
-                nttmp[:] = tmp * envelope / sigma2_coloured
-            else:
-                nttmp[:] = tmp / sigma2_coloured
-        else:
-            if use_envelope:
-                nttmp[:] = tmp * envelope
-            # else:
-            #     nttmp[:] = tmp
-
-    # Noise estimate
-    phitmp = e_R - e
-    avgphi_R = phitmp
-    phitmp = np.exp(phitmp)
-    tiled_phitmp = np.tile(phitmp, (N_T, 1)).T
-    sigma2_est[:] = (tiled_phitmp * sigma2_R).sum(axis=0)
-    correlation[:] = (tiled_phitmp * correlation_R).sum(axis=0)
-    power[:] = (tiled_phitmp * power_R).sum(axis=0)
-
-    if computerGrad:
-        if use_envelope or not use_whitenoise:
-            g[:] = tiled_phitmp * np.tile(nttmp, (N_R, 1)) * g
-        else:
-            tiled_phitmp *= -2.0 * div_in
-            g[:] = tiled_phitmp * g
-            
-    es = my_logsumexp(N_S, avgphi_S)
-    avgphi_S[:] = avgphi_S - es
-    ei = my_logsumexp(N_I, avgphi_I)
-    avgphi_I[:] = avgphi_I - ei
-
-    return lse_in, (avgphi_S[:N_S], avgphi_I[:N_I], avgphi_R[:N_R]), sigma2_est, correlation, power, workspace
-
-
-def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of 3D volume (N_R x N_T)
+def doimage_RI(slices, # np.ndarray[np.float32_t, ndim=2] slices,  # Slices of 3D volume (N_R x N_T)
                envelope, # np.ndarray[np.float32_t, ndim=1] envelope,  # (Experimental) envelope (N_T)
                ctf, # np.ndarray[np.float32_t, ndim=1] ctf,  # CTF operators (rotated) (N_I X N_T)
-               data, # np.ndarray[np.complex64_t, ndim=1] d,  # Image data (rotated) (N_I X N_T)
+               data, # np.ndarray[np.float32_t, ndim=1] d,  # Image data (rotated) (N_I X N_T)
                logW_I, # np.ndarray[np.float32_t, ndim=1] logW_I, # Inplane weights
                logW_R, # np.ndarray[np.float32_t, ndim=1] logW_R, # Slice weights 
                sigma2, # Inlier noise, can be a scalar or an N_T length vector
-               g, # np.ndarray[np.complex64_t, ndim=2] g, # Where to store gradient output
+               g, # np.ndarray[np.float32_t, ndim=2] g, # Where to store gradient output
                workspace):
     # type checking and size checking
     N_R, N_I, N_S, N_T = check(slices, None, envelope, ctf, data,
@@ -402,13 +237,15 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
 
     if use_whitenoise:
         sigma2_white = sigma2
-        div_in = -1.0 / (2.0 * sigma2)
+        # div_in = -1.0 / (2.0 * sigma2)
+        div_in = 1.0
     else:
         sigma2_coloured = sigma2
         assert sigma2_coloured.shape[0] == N_T
         tiled_sigma2_coloured = np.tile(sigma2_coloured, (N_I, 1))
-        div_in = -0.5
-    
+        # div_in = -0.5
+        div_in = 1.0
+
     if use_envelope:
         assert envelope.shape[0] == N_T
         tiled_envelope = np.tile(envelope, (N_I, 1))
@@ -419,31 +256,31 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
 
 
     for r, cproj in enumerate(slices):
-        cprojs = ctf * np.tile(cproj, (N_I, 1))
+        cprojs = ctf * np.tile(cproj, (N_I, 1)) + 1.0 - ctf
+        cim = ctf * data + 1.0 - ctf
         # compute the error at each frequency
-        correlation_I[:] = cprojs.real * data.real + cprojs.imag * data.imag
-        power_I[:] = cprojs.real ** 2 + cprojs.imag ** 2
+        correlation_I[:] = cprojs * cim # + cprojs.imag * cim.imag
+        power_I[:] = cprojs ** 2 # + cprojs.imag ** 2
 
-        if use_envelope:
-            g_I[:] = tiled_envelope * cprojs - data
-        else:
-            g_I[:] = cprojs - data
-        
+        # compute the gradient
+        if computerGrad:
+            if use_envelope:
+                g_I[:] = cim / (tiled_envelope * cprojs) - 1.0
+            else:
+                g_I[:] = cim / cprojs - 1.0
+            g_I[:] = ctf * g_I
+
         # compute the log likelihood
-        sigma2_I[:] = g_I.real ** 2 + g_I.imag ** 2
+        sigma2_I[:] = ctf * (cim * np.log(cprojs) - cprojs) # + my_gammaln(cim)
         if use_whitenoise:
             tmp = sigma2_I
         else:
             tmp = sigma2_I / tiled_sigma2_coloured
         e_I[:] = div_in * tmp.sum(axis=1) + logW_I
 
-        # compute the gradient
-        if computerGrad:
-            g_I[:] = ctf * g_I
-
         etmp = my_logsumexp(N_I, e_I)
         e_R[r] = etmp + logW_R[r]
-    
+
         # Noise estimate
         sigma2_R[r].fill(0.0)
         correlation_R[r].fill(0.0)
@@ -459,22 +296,9 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
 
         if computerGrad:
             g[r] = g[r] + (tiled_phitmp * g_I).sum(axis=0)
-        
+
     e = my_logsumexp(N_R, e_R)
     lse_in = -e
-
-    if computerGrad:
-        tmp = -2.0 * div_in
-        if not use_whitenoise:
-            if use_envelope:
-                nttmp[:] = tmp * envelope / sigma2_coloured
-            else:
-                nttmp[:] = tmp / sigma2_coloured
-        else:
-            if use_envelope:
-                nttmp[:] = tmp * envelope
-            # else:
-            #     nttmp[:] = tmp
 
     # Noise estimate
     phitmp = e_R - e
@@ -487,9 +311,9 @@ def doimage_RI(slices, # np.ndarray[np.complex64_t, ndim=2] slices,  # Slices of
 
     if computerGrad:
         if use_envelope or not use_whitenoise:
-            g[:] = tiled_phitmp * np.tile(nttmp, (N_R, 1)) * g
+            g[:] = tiled_phitmp * g
         else:
-            tiled_phitmp *= -2.0 * div_in
+            # tiled_phitmp *= -2.0 * div_in
             g[:] = tiled_phitmp * g
 
     ei = my_logsumexp(N_I, avgphi_I)

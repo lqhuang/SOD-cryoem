@@ -101,8 +101,8 @@ if __name__ == '__main__':
     pkl_file = sys.argv[1]
     print(pkl_file)
     stat_analyzer = StatAnalyzer(pkl_file)
-    stat_analyzer.plot_kern_timing()
-    stat_analyzer.plot_timer()
+    # stat_analyzer.plot_kern_timing()
+    # stat_analyzer.plot_timer()
     stat_analyzer.plot_sagd()
     stat_analyzer.show_all()
 

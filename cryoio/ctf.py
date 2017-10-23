@@ -8,7 +8,8 @@ import numpy as np
 def envelope_function(freq_radius, bfactor):
     logenv = -(bfactor / 4.0) * freq_radius**2
     envelope = np.exp(logenv)
-    return envelope
+    # return envelope
+    return np.ones_like(envelope, dtype=envelope.dtype)
 
 
 def compute_ctf(freqs, rots, akv, cs, wgh, dfmid1f, dfmid2f, angastf, dscale, bfactor=None):
@@ -44,7 +45,11 @@ def compute_ctf(freqs, rots, akv, cs, wgh, dfmid1f, dfmid2f, angastf, dscale, bf
     if bfactor is not None:
         ctf *= envelope_function(freq_radius, bfactor)
 
-    return np.require(ctf, dtype=freqs.dtype)
+    # return np.require(ctf, dtype=freqs.dtype)
+    ctf = np.ones_like(ctf, dtype=np.float32)
+    # ctf[freq_radius < 0.015] = 0.0
+    ctf[freq_radius < 0.001] = 0.0
+    return ctf
 
 
 @memoize

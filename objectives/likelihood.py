@@ -17,6 +17,9 @@ from symmetry import get_symmetryop
 from geometry import gencoords
 from cryoem import getslices
 
+from notimplemented import correlation
+from scipy.stats import entropy
+
 class UnknownRSLikelihood(Objective):
     def __init__(self):
         Objective.__init__(self,False)
@@ -101,9 +104,12 @@ class UnknownRSLikelihood(Objective):
 
         return exp_env
 
-
     def get_rmse(self):
-        return np.sqrt(self.get_sigma2_mle().mean())
+        if self.get_sigma2_mle().mean() > 0:
+            rmse = np.sqrt(self.get_sigma2_mle().mean())
+        else:
+            rmse = 1000
+        return rmse
 
     def get_sigma2_mle(self,noise_model='coloured'):
         N = self.cryodata.N
@@ -156,9 +162,11 @@ class UnknownRSLikelihood(Objective):
         tic_start = time.time()
         
         if self.kernel.slice_premult is not None:
-            pfM = density.real_to_fspace(self.kernel.slice_premult * M)
+            # pfM = density.real_to_fspace(self.kernel.slice_premult * M)
+            pfM = M
         else:
-            pfM = density.real_to_fspace(M)
+            # pfM = density.real_to_fspace(M)
+            pfM = M
         pmtime = time.time() - tic_start
 
         ret = self.kernel.eval(fM=pfM,M=None,compute_gradient=compute_gradient)
@@ -217,8 +225,7 @@ class UnknownRSKernel:
         self.sampler_I = None
         self.sampler_S = None
         
-        self.G_datatype = np.complex64
-
+        self.G_datatype = np.float32
 
     def set_samplers(self,sampler_R,sampler_I,sampler_S):
         self.sampler_R = sampler_R
@@ -234,6 +241,7 @@ class UnknownRSKernel:
         self.otf_thresh_R = params.get('otf_thresh_R',5000)
         self.otf_thresh_I = params.get('otf_thresh_I',500)
         self.fspace_premult_stack_caching = params.get('interp_cache_fspace', True)
+        self.ostream = ostream
         
     def set_dataset(self,cryodata):
         self.cryodata = cryodata
@@ -353,7 +361,7 @@ class UnknownRSKernel:
 
                 Gsz = (self.N_RI,self.N_T)
                 self.G = np.empty(Gsz, dtype=self.G_datatype)
-                self.slices = np.empty(np.prod(Gsz), dtype=np.complex64)
+                self.slices = np.empty(np.prod(Gsz), dtype=self.G_datatype)
             else:
                 self.using_precomp_slicing = False
                 print("generating OTF.")
@@ -440,7 +448,7 @@ class UnknownRSKernel:
 
                 Gsz = (self.N_R,self.N_T)
                 self.G = np.empty(Gsz, dtype=self.G_datatype)
-                self.slices = np.empty(np.prod(Gsz), dtype=np.complex64)
+                self.slices = np.empty(np.prod(Gsz), dtype=self.G_datatype)
             else:
                 self.using_precomp_slicing = False
                 print("generating OTF.")
@@ -586,6 +594,10 @@ class UnknownRSKernel:
         self.trunc_freq = np.require(self.trunc_xy / (self.N*psize), dtype=np.float32) 
         self.N_T = self.trunc_xy.shape[0]
 
+        self.use_angular_correlation = cparams.get('use_angular_correlation', False)
+        if self.ostream is not None:
+            self.ostream("\nUsing angular correlation: {0}".format(self.use_angular_correlation))
+
         interp_change = self.rad != rad or self.factoredRI != factoredRI
         if interp_change:
             print("Iteration {0}: freq = {3}, rad = {1}, N_T = {2}".format(cparams['iteration'], rad, self.N_T, max_freq))
@@ -606,27 +618,33 @@ class UnknownRSKernel:
         # Setup inlier model
         self.inlier_sigma2 = cparams['sigma']**2
         base_sigma2 = self.cryodata.noise_var
-        if isinstance(self.inlier_sigma2,np.ndarray):
-            self.inlier_sigma2 = self.inlier_sigma2.reshape(self.truncmask.shape)
-            self.inlier_sigma2_trunc = self.inlier_sigma2[self.truncmask != 0]
-            self.inlier_const = (self.N_T/2.0)*np.log(2.0*np.pi) + 0.5*np.sum(np.log(self.inlier_sigma2_trunc))
-        else:
-            self.inlier_sigma2_trunc = self.inlier_sigma2 
-            self.inlier_const = (self.N_T/2.0)*np.log(2.0*np.pi*self.inlier_sigma2)
+        # if isinstance(self.inlier_sigma2,np.ndarray):
+        #     self.inlier_sigma2 = self.inlier_sigma2.reshape(self.truncmask.shape)
+        #     self.inlier_sigma2_trunc = self.inlier_sigma2[self.truncmask != 0]
+        #     self.inlier_const = (self.N_T/2.0)*np.log(2.0*np.pi) + 0.5*np.sum(np.log(self.inlier_sigma2_trunc))
+        # else:
+        #     self.inlier_sigma2_trunc = self.inlier_sigma2
+        #     self.inlier_const = (self.N_T/2.0)*np.log(2.0*np.pi*self.inlier_sigma2)
+        self.inlier_sigma2_trunc = self.inlier_sigma2
+        self.inlier_const = 0.0
 
         # Compute the likelihood for the image content outside of rad
-        _,_,fspace_truncmask = gencoords(self.fspace_stack.get_num_pixels(), 2, rad*self.fspace_stack.get_num_pixels()/self.N, True)
-        self.imgpower = np.empty((self.minibatch['N_M'],),dtype=density.real_t)
-        self.imgpower_trunc = np.empty((self.minibatch['N_M'],),dtype=density.real_t)
-        for idx,Idx in enumerate(self.minibatch['img_idxs']):
-            Img = self.fspace_stack.get_image(Idx)
-            self.imgpower[idx] = np.sum(Img.real**2) + np.sum(Img.imag**2)
+        # _,_,fspace_truncmask = gencoords(self.fspace_stack.get_num_pixels(), 2, rad*self.fspace_stack.get_num_pixels()/self.N, True)
+        # self.imgpower = np.empty((self.minibatch['N_M'],),dtype=density.real_t)
+        # self.imgpower_trunc = np.empty((self.minibatch['N_M'],),dtype=density.real_t)
+        # for idx,Idx in enumerate(self.minibatch['img_idxs']):
+        #     Img = self.fspace_stack.get_image(Idx)
+        #     self.imgpower[idx] = np.sum(Img.real**2) + np.sum(Img.imag**2)
 
-            Img_trunc = Img[fspace_truncmask.reshape(Img.shape) == 0]
-            self.imgpower_trunc[idx] = np.sum(Img_trunc.real**2) + np.sum(Img_trunc.imag**2)
-        like_trunc = 0.5*self.imgpower_trunc/base_sigma2
-        self.inlier_like_trunc = like_trunc
-        self.inlier_const += ((self.N**2 - self.N_T)/2.0)*np.log(2.0*np.pi*base_sigma2)
+        #     Img_trunc = Img[fspace_truncmask.reshape(Img.shape) == 0]
+        #     self.imgpower_trunc[idx] = np.sum(Img_trunc.real**2) + np.sum(Img_trunc.imag**2)
+        # like_trunc = 0.5*self.imgpower_trunc/base_sigma2
+        # self.inlier_like_trunc = like_trunc
+        # self.inlier_const += ((self.N**2 - self.N_T)/2.0)*np.log(2.0*np.pi*base_sigma2)
+        self.imgpower = np.zeros((self.minibatch['N_M'],),dtype=density.real_t)
+        self.imgpower_trunc = np.zeros((self.minibatch['N_M'],), dtype=density.real_t)
+        self.inlier_like_trunc = np.zeros((self.minibatch['N_M'],), dtype=density.real_t)
+        self.inlier_const += 0.0
         
         # Setup the envelope function
         envelope = self.params.get('exp_envelope',None)
@@ -675,8 +693,9 @@ class UnknownRSKernel:
         res['N_Total_sampled'] = np.zeros(N_M,dtype=np.uint32)
         
         # Divide by the normalization constant with sigma=noise_std to keep it from being huge
-        res['totallike_logscale'] = (self.N**2/2.0)*np.log(2.0*np.pi*basesigma2)
-        
+        # res['totallike_logscale'] = (self.N**2/2.0)*np.log(2.0*np.pi*basesigma2)
+        res['totallike_logscale'] = 0.0
+
         res['kern_timing'] = {'prep_sample_R':np.empty(N_M),'prep_sample_I':np.empty(N_M),
                               'prep_slice':np.empty(N_M), 'prep_rot_img':np.empty(N_M), 'prep_rot_ctf':np.empty(N_M),
                               'prep':np.empty(N_M),'work':np.empty(N_M),'proc':np.empty(N_M),'store':np.empty(N_M)}
@@ -686,7 +705,6 @@ class UnknownRSKernel:
         return res
 
     def prep_operators(self,fM,idx, slicing = True, res=None):
-        
         Idx = self.minibatch['img_idxs'][idx]
         if self.cryodata.ctfstack is not None:
             CIdx = self.minibatch['ctf_idxs'][idx]
@@ -823,6 +841,19 @@ class UnknownRSKernel:
                 W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
                 W_S_sampled, sampleinfo_S, S_sampled
         else:
+            # check invalid value ( < 1.0 )
+            # print("number of slices_sampled < 1.0:", (slices_sampled<1.0).sum(axis=1).mean())
+            # print("min of slices_sampled:", slices_sampled.min())
+            # print("slices_sampled", rotc_sampled[0] * slices_sampled[0])
+            np.maximum(1e-6, slices_sampled, out=slices_sampled)
+
+            # invalid_rotd_sampled = rotd_sampled < 1.0
+            # print("number of invalid rotd_sampled", invalid_rotd_sampled.sum(axis=1).mean())
+            # rotd_sampled = rotc_sampled * rotd_sampled + 1.0 - rotc_sampled
+            # print("number of rotd_sampled < 1.0", rotd_sampled.min())
+            # print("rotd_sampled", rotc_sampled[0] * rotd_sampled[0])
+            np.maximum(1e-6, rotd_sampled, out=rotd_sampled)
+
             return slice_ops, envelope, \
                 W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
                 W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled
@@ -873,3 +904,32 @@ class UnknownRSKernel:
             res['CV2_I'][idx] = (1.0/np.sum(cphi_I**2,dtype=np.float64))
             if cphi_S is not None:
                 res['CV2_S'][idx] = (1.0/np.sum(cphi_S**2,dtype=np.float64))
+
+    def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I):
+        psize = self.params['pixel_size']
+
+        N_R, N_T = slices_sampled.shape
+        assert rotd_sampled[0].shape == rotc_sampled[0].shape
+        assert rotd_sampled[0].shape[0] == N_T
+
+        argmax_W_I = W_I.argmax()
+        if envelope is not None:
+            assert envelope.shape[0] == slices_sampled.shape[1], "wrong length for envelope"
+            slices_sampled = np.tile(envelope, (N_R, 1)) \
+                             * np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
+                             * slices_sampled
+        else:
+            slices_sampled = np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
+                             * slices_sampled
+
+        ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, psize)
+        ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[argmax_W_I]), self.N, self.rad, psize)
+
+        # check zeros
+        ac_slices[ac_slices == 0.0] + 1e-16
+        # calculating K-L divergence
+        ac_e_R = entropy(np.tile(ac_data, (N_R, 1)).T, ac_slices.T)  # qk is used to approximate pk, qk
+        ac_indices = ac_e_R.argsort()
+        cutoff = 7
+
+        return ac_indices[0:cutoff]

@@ -14,6 +14,7 @@ import numpy as np
 from shutil import copyfile
 from util import BackgroundWorker, Output, OutputStream, Params, format_timedelta, gitutil, FiniteRunningSum
 import cryoem
+import cryoops
 from objectives import eval_objective, SumObjectives
 from importancesampler.gaussian import FixedGaussianImportanceSampler
 from importancesampler.fisher import FixedFisherImportanceSampler
@@ -36,6 +37,7 @@ from cryoio.mrc import writeMRC, readMRC
 
 from symmetry import get_symmetryop
 import density
+import geometry
 
 # precond should ideally be set to inv(chol(H)) where H is the Hessian
 def density2params(M,fM,xtype,grad_transform = False,precond = None):
@@ -57,6 +59,7 @@ def density2params(M,fM,xtype,grad_transform = False,precond = None):
 
         x0 = np.empty((2*fM.size,),dtype=density.real_t)
         x0[0:fM.size] = pfM.real.reshape((-1,))
+        raise NotImplementedError('???? imag')
         x0[fM.size:] = pfM.imag.reshape((-1,))
     elif xtype == 'complex_herm_coeff':
         assert precond is None, 'Unimplemented'
@@ -79,6 +82,7 @@ def density2params(M,fM,xtype,grad_transform = False,precond = None):
 
         x0 = np.empty((2*NC*N**2,),dtype=density.real_t)
         x0[0:NC*N**2] = herm_freqs.real.reshape((-1,))
+        raise NotImplementedError('???? imag')
         x0[NC*N**2:] = herm_freqs.imag.reshape((-1,))
  
     return x0
@@ -162,10 +166,12 @@ class ObjectiveWrapper:
                                   precond=self.precond)
 
             if comp_real and M is None:
-                M = density.fspace_to_real(fM)
+                # M = density.fspace_to_real(fM)
+                M = fM
 
             if comp_fspace and fM is None:
-                fM = density.real_to_fspace(M)
+                # fM = density.real_to_fspace(M)
+                fM = M
                 
         return M, fM
 
@@ -305,6 +311,7 @@ class CryoOptimizer(BackgroundWorker):
             try:
                 if iotype == 'mrc':
                     writeMRC(fname,*data)
+                    np.save(fname, data[0])
                 elif iotype == 'pkl':
                     with open(fname, 'wb') as f:
                         pickle.dump(data, f, protocol=2)
@@ -388,9 +395,9 @@ class CryoOptimizer(BackgroundWorker):
             seed = eval(seed)
         self.cryodata.divide_dataset(minibatch_size,testset_size,partition,num_partitions,seed)
         
-        self.cryodata.set_datasign(self.params.get('datasign','auto'))
-        if self.params.get('normalize_data',True):
-            self.cryodata.normalize_dataset()
+        # self.cryodata.set_datasign(self.params.get('datasign','auto'))
+        # if self.params.get('normalize_data',True):
+        #     self.cryodata.normalize_dataset()
 
         self.voxel_size = self.cryodata.pixel_size
 
@@ -453,18 +460,38 @@ class CryoOptimizer(BackgroundWorker):
             print("Randomly generating initial density (init_random_seed = {0})...".format(init_seed)); sys.stdout.flush()
             tic = time.time()
             M = cryoem.generate_phantom_density(self.cryodata.N, 0.95*self.cryodata.N/2.0, \
-                                                5*self.cryodata.N/128.0, 30, seed=init_seed)
+                                                2*self.cryodata.N/128.0, 30, seed=init_seed)
             print("done in {0}s".format(time.time() - tic))
 
-        tic = time.time()
-        print("Windowing and aligning initial density..."); sys.stdout.flush()
+        # tic = time.time()
+        # print("Windowing and aligning initial density..."); sys.stdout.flush()
         # window the initial density
-        wfunc = self.cparams.get('init_window','circle')
-        cryoem.window(M,wfunc)
+        # wfunc = self.cparams.get('init_window','circle')
+        # cryoem.window(M,wfunc)
 
         # Center and orient the initial density
-        cryoem.align_density(M)
-        print("done in {0:.2f}s".format(time.time() - tic))
+        # cryoem.align_density(M)
+        # print("done in {0:.2f}s".format(time.time() - tic))
+
+        M_totalmass = 5000
+        M *= M_totalmass / M.sum()
+        N = M.shape[0]
+
+        # oversampling
+        zeropad = 1
+        zeropad_size = int(zeropad * (N / 2))
+        zp_N = zeropad_size * 2 + N
+        zpm_shape = (zp_N,) * 3
+        zp_M = np.zeros(zpm_shape, dtype=density.real_t)
+        zpm_slices = (slice( zeropad_size, (N + zeropad_size) ),) * 3
+        zp_M[zpm_slices] = M
+        kernel = 'lanczos'
+        ksize = 6
+        premult = cryoops.compute_premultiplier(zp_N, kernel, ksize)
+        V = density.real_to_fspace(
+            premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * zp_M)
+        M = (V.real ** 2 + V.imag ** 2)[zpm_slices]
+        assert M.shape == (N, N, N)
 
         # apply the symmetry operator
         init_sym = get_symmetryop(self.cparams.get('init_symmetry',self.cparams.get('symmetry',None)))
@@ -474,22 +501,23 @@ class CryoOptimizer(BackgroundWorker):
             M = init_sym.apply(M)
             print("done in {0:.2f}s".format(time.time() - tic))
 
-        tic = time.time()
-        print("Scaling initial model..."); sys.stdout.flush()
+        # tic = time.time()
+        # print("Scaling initial model..."); sys.stdout.flush()
         modelscale = self.cparams.get('modelscale','auto')
-        mleDC, _, mleDC_est_std = self.cryodata.get_dc_estimate()
+        # mleDC, _, mleDC_est_std = self.cryodata.get_dc_estimate()
         if modelscale == 'auto':
-            # Err on the side of a weaker prior by using a larger value for modelscale
-            modelscale = (np.abs(mleDC) + 2*mleDC_est_std)/self.cryodata.N
-            print("estimated modelscale = {0:.3g}...".format(modelscale)); sys.stdout.flush()
+        #     # Err on the side of a weaker prior by using a larger value for modelscale
+        #     modelscale = (np.abs(mleDC) + 2*mleDC_est_std)/self.cryodata.N
+        #     print("estimated modelscale = {0:.3g}...".format(modelscale)); sys.stdout.flush()
+            modelscale = 1.0
             self.params['modelscale'] = modelscale
             self.cparams['modelscale'] = modelscale
-        M *= modelscale/M.sum()
-        print("done in {0:.2f}s".format(time.time() - tic))
-        if mleDC_est_std/np.abs(mleDC) > 0.05:
-            print("  WARNING: the DC component estimate has a high relative variance, it may be inaccurate!")
-        if ((modelscale*self.cryodata.N - np.abs(mleDC)) / mleDC_est_std) > 3:
-            print("  WARNING: the selected modelscale value is more than 3 std devs different than the estimated one.  Be sure this is correct.")
+        # M *= modelscale/M.sum()
+        # print("done in {0:.2f}s".format(time.time() - tic))
+        # if mleDC_est_std/np.abs(mleDC) > 0.05:
+        #     print("  WARNING: the DC component estimate has a high relative variance, it may be inaccurate!")
+        # if ((modelscale*self.cryodata.N - np.abs(mleDC)) / mleDC_est_std) > 3:
+        #     print("  WARNING: the selected modelscale value is more than 3 std devs different than the estimated one.  Be sure this is correct.")
 
         # save initial model
         tic = time.time()
@@ -499,7 +527,8 @@ class CryoOptimizer(BackgroundWorker):
         print("done in {0:.2f}s".format(time.time() - tic))
 
         self.M = np.require(M,dtype=density.real_t)
-        self.fM = density.real_to_fspace(M)
+        # self.fM = density.real_to_fspace(M)
+        self.fM = M
         self.dM = density.zeros_like(self.M)
 
         self.step = eval(self.cparams['optim_algo'])
@@ -713,7 +742,8 @@ class CryoOptimizer(BackgroundWorker):
         if self.fM is None or apply_sym \
            or self.cparams['density_lb'] != None \
            or self.cparams['density_ub'] != None:
-            self.fM = density.real_to_fspace(self.M)
+            # self.fM = density.real_to_fspace(self.M)
+            self.fM = self.M
         timing['step_finalize'] = time.time() - tic_stepfinalize
 
         # Compute step statistics

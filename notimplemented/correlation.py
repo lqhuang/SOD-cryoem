@@ -3,6 +3,7 @@ from __future__ import print_function, division
 import os
 import sys
 sys.path.append(os.path.dirname(sys.path[0]))
+import warnings
 
 import numpy as np
 from scipy import interpolate
@@ -151,7 +152,7 @@ def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
     return c, truncc, trunkmask
 
 
-def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
+def calc_angular_correlation(trunc_slices, N, rad, pixel_size=1.0, interpolation='nearest',
                              sort_theta=True, clip=True, outside=False,):
     """compute angular correlation for input array
     outside: True or False (default: False)
@@ -197,46 +198,72 @@ def calc_angular_correlation(trunc_slices, N, rad, interpolation='nearest',
         raise NotImplementedError()
     else:
         raise ValueError('unsupported method for interpolation')
+    # sorted_rho_freqs = sorted_rho / (N * pixel_size)
+    resolution = 1.0 / (N * pixel_size)
 
     _, unique_idx, unique_counts = np.unique(sorted_rho, return_index=True, return_counts=True)
     indices = [slice(None)] * trunc_slices.ndim
     angular_correlation = np.zeros_like(trunc_slices, dtype=trunc_slices.dtype)
     for i, count in enumerate(unique_counts):
         indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
-        if count < 2:
+        # minimum points to do fft (2 or 4 times than Nyquist frequency)
+        minimum_sample_points = (4 / count) / resolution
+        if count <  minimum_sample_points:
             angular_correlation[indices]  = np.copy(sorted_slice[indices])
         else:
             # use view (slicing) or copy (fancy indexing, np.take(), np.put())?
             same_rho = np.copy(sorted_slice[indices])
             fpcimg_real = density.real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
             angular_correlation[indices].real = density.fspace_to_real(
-                fpcimg_real * fpcimg_real.conjugate(), axes=(axis,))
+                fpcimg_real * fpcimg_real.conjugate(), axes=(axis,)).real
             if iscomplex:  # FIXME: stupid way. optimize this
                 fpcimg_fourier = density.real_to_fspace(same_rho.imag, axes=(axis,))  # polar image in fourier sapce
                 angular_correlation[indices].imag = density.fspace_to_real(
-                    fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,))
+                    fpcimg_fourier * fpcimg_fourier.conjugate(), axes=(axis,)).real
+
+    # check inf and nan
+    if np.any(np.isinf(angular_correlation)):
+        warnings.warn("Some values in angular correlation occur inf. These values have been set to zeros.")
+        angular_correlation.real[np.isinf(angular_correlation.real)] = 0
+        if iscomplex:
+            angular_correlation.imag[np.isinf(angular_correlation.imag)] = 0
+    if np.any(np.isnan(angular_correlation)):
+        warnings.warn("Some values in angular correlation occur inf. These values have been set to zeros.")
+        angular_correlation.real[np.isnan(angular_correlation.real)] = 0
+        if iscomplex:
+            angular_correlation.imag[np.isnan(angular_correlation.imag)] = 0
 
     # 4.
     if clip:
-        factor = 3
+        factor = 3.0
         for i, count in enumerate(unique_counts):
-            indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
-            if count < 10:
+            minimum_sample_points = (4 / count) / resolution
+            if count <  minimum_sample_points:
                 pass
             else:
-                mean = angular_correlation[indices].mean(axis)
-                std = angular_correlation[indices].std(axis)
-                vmin = mean - std * factor
-                vmax = mean + std * factor
-                # angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
-                angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
+                indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
+                mean = np.tile(angular_correlation[indices].mean(axis), (count, 1)).T
+                std = np.tile(angular_correlation[indices].std(axis), (count, 1)).T
+
+                if np.all(std < 1e-16):
+                    warnings.warn("Standard deviation all equal to zero")
+                    vmin = mean.mean(axis) - factor * std.mean(axis)
+                    vmax = mean.mean(axis) + factor * std.mean(axis)
+                else:
+                    angular_correlation[indices] = (angular_correlation[indices] - mean) / std
+                    vmin = -factor
+                    vmax = +factor
+
+                angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
+                # angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
+
 
     # 5.
     corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)
     return corr_trunc_slices
 
 
-def calc_full_ac(image, rad, outside=True, **ac_kwargs):    
+def calc_full_ac(image, rad, outside=True, **ac_kwargs):
     import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
     import sincint
 
@@ -253,7 +280,7 @@ def calc_full_ac(image, rad, outside=True, **ac_kwargs):
     if outside:
         _, _, outside_mask = gencoords_outside(N, 2, rad, True)
         corr_trunc_outside = calc_angular_correlation(image[outside_mask.reshape(N, N)].flatten(),
-                                                    N, rad, outside=True, **ac_kwargs)
+                                                      N, rad, outside=True, **ac_kwargs)
         full_angular_correlation[outside_mask] = corr_trunc_outside
 
     return full_angular_correlation.reshape(N, N)

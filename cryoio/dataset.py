@@ -25,14 +25,15 @@ class CryoDataset:
         self.pixel_size = self.imgstack.get_pixel_size()
 
     def compute_noise_statistics(self):
-        self.mleDC_est = self.estimate_dc()
+        # self.mleDC_est = self.estimate_dc()
         self.noise_var = self.imgstack.estimate_noise_variance()
         self.data_var = self.imgstack.compute_variance()
+        self.noise_var = 1.0
 
         print('Dataset noise profile')
         print('  Noise: {0:.3g}'.format(np.sqrt(self.noise_var)))
         print('  Data: {0:.3g}'.format(np.sqrt(self.data_var)))
-        assert self.data_var > self.noise_var
+        # assert self.data_var > self.noise_var
         self.signal_var = self.data_var - self.noise_var
         print('  Signal: {0:.3g}'.format(np.sqrt(self.signal_var)))
         print('  Signal-to-Noise Ratio: {0:.1f}% ({1:.1f}dB)'.format(100 * self.signal_var / self.noise_var, 10 * np.log10(self.signal_var / self.noise_var)))

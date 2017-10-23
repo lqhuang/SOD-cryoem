@@ -44,14 +44,16 @@ class SumObjectives(Objective):
         if fM is None and anyfspace:
             assert M is not None, 'M or fM must be set!'
             N = M.shape[0]
-            fM = density.real_to_fspace(M)
+            # fM = density.real_to_fspace(M)
+            fM = M
         elif fM is not None:
             N = fM.shape[0]
 
         if M is None and anyrspace:
             assert fM is not None, 'M or fM must be set!'
             N = fM.shape[0]
-            M = density.fspace_to_real(fM)
+            # M = density.fspace_to_real(fM)
+            M = fM
         elif M is not None:
             assert N is None or N == M.shape[0]
             N = M.shape[0]
@@ -69,14 +71,16 @@ class SumObjectives(Objective):
         if fM is None and anyfspace:
             assert M is not None, 'M or fM must be set!'
             N = M.shape[0]
-            fM = density.real_to_fspace(M)
+            # fM = density.real_to_fspace(M)
+            fM = M
         elif fM is not None:
             N = fM.shape[0]
 
         if M is None and anyrspace:
             assert fM is not None, 'M or fM must be set!'
             N = fM.shape[0]
-            M = density.fspace_to_real(fM)
+            # M = density.fspace_to_real(fM)
+            M = fM
         elif M is not None:
             assert N is None or N == M.shape[0]
             N = M.shape[0]
@@ -108,9 +112,11 @@ class SumObjectives(Objective):
                     if obj.fspace == self.fspace:
                         dlogPs.append(cdlogP)
                     elif self.fspace:
-                        dlogPs.append(density.real_to_fspace(cdlogP))
+                        # dlogPs.append(density.real_to_fspace(cdlogP))
+                        dlogPs.append(cdlogP)
                     else:
-                        dlogPs.append(density.fspace_to_real(cdlogP))
+                        # dlogPs.append(density.fspace_to_real(cdlogP))
+                        dlogPs.append(cdlogP)
                     dlogP += dlogPs[-1]
                 else:
                     if obj.fspace:
@@ -133,11 +139,13 @@ class SumObjectives(Objective):
             if self.fspace:
                 dlogP = dlogPdfM
                 if anyrspace:
-                    dlogP += density.real_to_fspace(dlogPdM)
+                    # dlogP += density.real_to_fspace(dlogPdM)
+                    dlogP += dlogPdM
             else:
                 dlogP = dlogPdM
                 if anyfspace:
-                    dlogP += density.fspace_to_real(dlogPdfM)
+                    # dlogP += density.fspace_to_real(dlogPdfM)
+                    dlogP += dlogPdfM
         
         outputs['all_logPs'] = logPs
         if compute_gradient and all_grads:

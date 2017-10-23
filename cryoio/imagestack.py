@@ -221,7 +221,7 @@ class FourierStack:
         if not self.caching:
             self.transformed = {}
         if idx not in self.transformed:
-            self.fft_lock.acquire()
+            # self.fft_lock.acquire()
             if self.zeropad:
                 N = self.stack.get_num_pixels()
                 img = self.zpimg
@@ -230,15 +230,16 @@ class FourierStack:
             else:
                 img = self.stack.get_image(idx)
 
-            if self.premult is not None:
-                img = self.premult * img
+            # if self.premult is not None:
+            #     img = self.premult * img
 
-            self.transformed[idx] = density.real_to_fspace(img)
-            self.fft_lock.release()
+            # self.transformed[idx] = density.real_to_fspace(img)
+            self.transformed[idx] = np.require(img, dtype=density.real_t)
+            # self.fft_lock.release()
 
-            self.fspacesum += self.transformed[idx]
-            self.powersum += self.transformed[idx].real**2 + \
-                self.transformed[idx].imag**2
+            # self.fspacesum += self.transformed[idx]
+            # self.powersum += self.transformed[idx].real**2 + \
+            #     self.transformed[idx].imag**2
             self.nsum += 1
 
         return self.transformed[idx]

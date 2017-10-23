@@ -315,8 +315,10 @@ class SAGDStep(base.BaseStep):
                             ostream=ostream, precond=precond,
                             minStep=minStep, maxStep=maxStep,
                             optThresh=optThresh)
+            # self.L = 1.0
 
         currL = self.L
+        print("self.L", self.L)
 
         if init_L:
             self.save_L0(params)

@@ -163,3 +163,17 @@ def gencoords(N, d, rad=None, truncmask=False, trunctype='circ'):
  
     return c, truncc, trunkmask
  
+ def gen_trunc_mask(N, d, rad_freq, mask_freq, psize=1):
+    rad = rad_freq * 2.0 * psize
+    freqs = gencoords(N, d, rad) / (N * psize)
+    freqs_radius = np.sqrt( (freqs ** 2).sum(axis=1) )
+    mask_outlier = np.require(np.float_(freqs_radius > mask_freq), dtype=np.float32)
+    return mask_outlier
+
+def gen_dense_mask(N, d, mask_freq, psize=1):
+    freqs = gencoords_base(N, d) / (N * psize)
+    freqs_radius = np.sqrt( (freqs ** 2).sum(axis=1) )
+    shape = (N, ) * d
+    # mask_inliner = np.float_(freqs_radius < rad, dtype=np.float32).reshape(shape)
+    mask_outlier = np.require(np.float_(freqs_radius > mask_freq), dtype=np.float32).reshape(shape)
+    return mask_outlier

@@ -17,6 +17,7 @@ import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()}
 from . import objective_kernels
 
 from objectives.likelihood import UnknownRSKernel
+from notimplemented import py_objective_kernels
 
 
 class UnknownRSThreadedCPUKernel(UnknownRSKernel):
@@ -51,6 +52,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
     def precompute_projections(self,fM):
         if self.using_precomp_slicing:
             # precompute all possible slices
+            fM = np.require(fM, dtype=np.float32)
             getslices(fM.reshape((-1,)), self.slice_ops, res=self.slices)
             self.precomp_slices = self.slices.reshape((-1, self.N_T))
         else:
@@ -127,23 +129,26 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                     g = None
                 res['kern_timing']['prep'][idx] = time.time() - tic
 
+                # get angular correlation slices
+                if self.use_angular_correlation:
+                    tic = time.time()
+                    # ac_slices_sampled, ac_data_sampled
+                    ac_indices = self.get_angular_correlation(
+                        slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I_sampled)
+                else:
+                    pass  # add timing
+
                 tic = time.time()
                 if self.sampler_S is not None:
-                    if len(W_I_sampled) == 1:
-                        like[idx], (cphi_S,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                            objective_kernels.doimage_RS(slices_sampled, \
-                                                S_sampled, envelope, \
-                                                rotc_sampled.reshape((-1,)), rotd_sampled.reshape((-1,)), \
-                                                log_W_S, log_W_R, \
-                                                sigma2, g, workspace )
-                        cphi_I = np.array([0.0])
-                    else:
-                        like[idx], (cphi_S,cphi_I,cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                            objective_kernels.doimage_RIS(slices_sampled, \
-                                                S_sampled, envelope, \
-                                                rotc_sampled, rotd_sampled, \
-                                                log_W_S, log_W_I, log_W_R, \
-                                                sigma2, g, workspace )
+                    raise NotImplementedError('no shifts')
+                if self.use_angular_correlation:
+                    like[idx], (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
+                        objective_kernels.doimage_ACRI(slices_sampled, envelope, \
+                            rotc_sampled, rotd_sampled, \
+                            # ac_slices_sampled, ac_data_sampled, \
+                            ac_indices,
+                            log_W_I, log_W_R, \
+                            sigma2, g, workspace)
                 else:
                     if len(W_I_sampled) == 1:
                         like[idx], cphi_R, csigma2_est, ccorrelation, cpower, workspace = \
@@ -264,6 +269,8 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
 
         L = outputs['like'].sum(dtype=np.float64)/N_M
         outputs['L'] = L
+
+        print("Like", L)
 
         if compute_gradient:
             return L, dLdfM, outputs
