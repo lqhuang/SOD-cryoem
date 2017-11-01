@@ -47,6 +47,7 @@ def update_workspace(workspace, N_R, N_I, N_S, N_T):
         workspace['sigma2_R'] = n.empty((N_R,N_T), dtype=n.float64)
         workspace['correlation_R'] = n.empty((N_R,N_T), dtype=n.float64)
         workspace['power_R'] = n.empty((N_R,N_T), dtype=n.float64)
+        workspace['g_R'] = n.empty((N_R,N_T), dtype=n.complex64)
         if workspace['N_R'] < N_R:
             workspace['e_R'] = n.empty((N_R,), dtype=n.float64)
             workspace['avgphi_R'] = n.empty((N_R,), dtype=n.float64)
@@ -632,14 +633,12 @@ def doimage_R(n.ndarray[n.complex64_t, ndim=2] slices,  # Slices of 3D volume (N
             phitmp = exp(phitmp)
             for t in xrange(N_T):
                 sigma2_est[t] += phitmp*sigma2_R[r,t]
-            for t in xrange(N_T):
                 correlation[t] += phitmp*correlation_R[r,t]
-            for t in xrange(N_T):
                 power[t] += phitmp*power_R[r,t]
                 
             if computeGrad:
                 for t in xrange(N_T):
-                    g[r,t] = phitmp * nttmp[t] * g[r,t]
+                    g[r,t] = phitmp * nttmp[t] * g_R[r,t]
 
         # es = my_logsumexp(N_S, <double*>avgphi_S.data)
         # for s in xrange(N_S):
