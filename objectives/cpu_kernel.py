@@ -11,7 +11,7 @@ except ModuleNotFoundError:
 
 import numpy as np
 
-from cryoem import getslices
+from cryoem import getslices_interp, merge_slices
 
 import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()},reload_support=True)
 from . import objective_kernels
@@ -53,7 +53,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
         if self.using_precomp_slicing:
             # precompute all possible slices
             fM = np.require(fM, dtype=np.float32)
-            getslices(fM.reshape((-1,)), self.slice_ops, res=self.slices)
+            getslices_interp(fM, self.slice_ops, self.rad, res=self.slices.reshape(-1, self.N_T))
             self.precomp_slices = self.slices.reshape((-1, self.N_T))
         else:
             # do on-the-fly slicing
@@ -181,7 +181,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                     if self.using_precomp_slicing:
                         lcl_G[slice_inds] += g
                     else:
-                        lcl_G += slice_ops.T.dot(g.reshape((-1,))).reshape(lcl_G.shape)
+                        lcl_G += merge_slices(g, slice_ops, self.N, self.rad).reshape(self.N, self.N, self.N)
                 res['kern_timing']['proc'][idx] = time.time() - tic
 
                 tic = time.time()
@@ -246,7 +246,8 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
         if compute_gradient:
             tic = time.time()
             if self.using_precomp_slicing:
-                dLdfM = self.slice_ops.T.dot(self.G.reshape((-1,))).reshape((self.N,self.N,self.N))
+                # dLdfM = self.slice_ops.T.dot(self.G.reshape((-1,))).reshape((self.N,self.N,self.N))
+                dLdfM = merge_slices(self.G, self.slice_ops, self.N, self.rad).reshape(self.N, self.N, self.N)
                 dLdfM /= N_M
             else:
                 dLdfM = self.G/N_M

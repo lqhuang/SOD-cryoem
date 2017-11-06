@@ -1,0 +1,11 @@
+# Common parameters for EMD-6044 optimization experiments
+{
+'dataset_name': "'EMD-6044'",
+'inpath': 'data/EMD6044_xfel_20000_totalmass_500000_oversampling_1/imgdata.mrc',
+'ctfpath': 'data/EMD6044_xfel_20000_totalmass_500000_oversampling_1/defocus.txt',
+'microscope_params': {'akv':200,'wgh':0.07,'cs':2.0},
+'resolution': 2.8,
+'learn_like_envelope_bfactor': 500.0,
+}
+
+

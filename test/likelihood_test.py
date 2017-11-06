@@ -32,6 +32,7 @@ from test.dataset_test import dataset_loading_test, SimpleDataset
 cython_build_dirs = os.path.expanduser('~/.pyxbld/angular_correlation')
 import pyximport; pyximport.install(build_dir=cython_build_dirs, setup_args={"include_dirs":np.get_include()},reload_support=True)
 from objectives import objective_kernels
+import sincint
 
 
 # ------------------------ utils------------------------------------- #
@@ -123,17 +124,14 @@ def load_kernel(data_dir, model_file, use_angular_correlation=False, sample_shif
                                             5 * cryodata.N / 128.0, 30, seed=0)
         M *= modelscale/M.sum()
     slice_interp = {'kern': 'lanczos', 'kernsize': 4, 'zeropad': 0, 'dopremult': True}
-    fM = M  # SimpleKernel.get_fft(M, slice_interp)
+    fM = M
 
     minibatch = cryodata.get_next_minibatch(shuffle_minibatches=False)
 
     is_sym = get_symmetryop(data_params.get('symmetry',None))
     sampler_R = FixedFisherImportanceSampler('_R', is_sym)
     sampler_I = FixedFisherImportanceSampler('_I')
-    if sample_shifts:
-        sampler_S = FixedGaussianImportanceSampler('_S')
-    else:
-        sampler_S = None
+    sampler_S = None
 
     cparams = {
         'use_angular_correlation': use_angular_correlation,
@@ -190,18 +188,10 @@ def kernel_test(data_dir, model_file, use_angular_correlation=False):
         img_idx = kernel.minibatch['img_idxs'][idx]
         ea = euler_angles[img_idx]
         ea_vec = geometry.genDir([ea]).reshape(1, -1)
-
-        if kernel.sampler_S is not None:
-            slice_ops, envelope, \
-            W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
-            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
-            W_S_sampled, sampleinfo_S, S_sampled = \
-                kernel.prep_operators(kernel.fM, idx)
-        else:
-            slice_ops, envelope, \
-            W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
-            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
-                kernel.prep_operators(kernel.fM, idx)
+        slice_ops, envelope, \
+        W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
+        W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
+            kernel.prep_operators(kernel.fM, img_idx)
 
         if kernel.use_angular_correlation:
             tic = time.time()
@@ -218,14 +208,14 @@ def kernel_test(data_dir, model_file, use_angular_correlation=False):
 
         if kernel.use_angular_correlation:
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
+                objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                     rotc_sampled, rotd_sampled, \
                     ac_slices_sampled, ac_data_sampled, \
                     log_W_I, log_W_R, \
                     sigma2, g, workspace)
         else:
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                py_objective_kernels.doimage_RI(slices_sampled, envelope, \
+                objective_kernels.doimage_RI(slices_sampled, envelope, \
                 rotc_sampled, rotd_sampled, \
                 log_W_I, log_W_R, \
                 sigma2, g, workspace)
@@ -344,7 +334,7 @@ class SimpleKernel():
             tic = time.time()
             # set slicing interpolation parameters
             self.slice_params = {'quad_type': 'sk97'}
-            self.slice_interp = {'N': self.N, 'kern': 'lanczos', 'kernsize': 4, 'rad': rad, 'zeropad': 0, 'dopremult': True}
+            self.slice_interp = {'N': self.N, 'kern': 'lanczos', 'kernsize': 6, 'rad': rad, 'zeropad': 0, 'dopremult': True, }# 'onlyRs': True}
             # set slicing quadrature
             usFactor_R = 1.0
             quad_R = quadrature.quad_schemes[('dir', self.slice_params['quad_type'])]
@@ -362,7 +352,7 @@ class SimpleKernel():
 
             tic = time.time()
             # set inplane interpolation parameters
-            self.inplane_interp = {'N': self.N, 'kern': 'lanczos', 'kernsize': 4, 'rad': rad, 'zeropad': 0, 'dopremult': True}
+            self.inplane_interp = {'N': self.N, 'kern': 'lanczos', 'kernsize': 6, 'rad': rad, 'zeropad': 0, 'dopremult': True, }# 'onlyRs': True}
             # set inplane quadrature
             usFactor_I = 1.0
             maxAngle = quadrature.compute_max_angle(self.N, rad, usFactor_I)
@@ -403,7 +393,6 @@ class SimpleKernel():
             rotc_sampled = cCTF.compute(self.trunc_freq, self.quad_domain_I.theta).T
         else:
             rotc_sampled = np.ones_like(rotd_sampled, dtype=density.real_t)
-            rotc_sampled[:, 0:3] = 0.0
 
         # compute operators and slices
         # slicing samples
@@ -416,26 +405,31 @@ class SimpleKernel():
         if self.use_cached_slicing and self.slices_sampled is not None:
             slices_sampled = self.slices_sampled
         else:
-            fM = self.model  # self.get_fft(self.model, self.slice_interp)
-            slices_sampled = cryoem.getslices(fM, self.slice_ops).reshape((N_R, N_T))
-            # slices_sampled /= self.cryodata.real_noise_var  # balance between slicing and data?
+            fM = self.model
+            slices_sampled = cryoem.getslices_interp(fM, self.slice_ops, self.rad).reshape((N_R, N_T))
+            slices_sampled *= np.tile(rotc_sampled[0], (N_R, 1))
+            # slices_sampled += 1.0
             self.slices_sampled = slices_sampled
-            # compute angular correlation
-            if envelope is not None:
-                assert envelope.shape[0] == slices_sampled.shape[1], "wrong length for envelope"
-                slices_sampled = np.tile(envelope, (N_R, 1)) * np.tile(rotc_sampled[0], (N_R, 1)) \
-                                * slices_sampled
-            else:
-                slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
 
         # inplane samples
         W_I = self.inplane_quad['W']
         W_I_sampled = np.require(W_I, dtype=density.real_t)
         sampleinfo_I = None  # N_I_sampled, samples_I, sampleweights_I
         # self.inplane_ops = self.quad_domain_I.compute_operator(self.interp_params_I, self.samples_I)
-        curr_fft_image = self.cryodata.get_fft_image(idx)
-        print('max intensity for fft proj:', curr_fft_image.max())
-        rotd_sampled = cryoem.getslices(curr_fft_image, self.inplane_ops).reshape((N_I, N_T))
+        curr_fft_image = self.cryodata.get_image(idx)
+        print('(min, max) intensity for fft proj: ({}, {})'.format(curr_fft_image.min(), curr_fft_image.max()))
+        rotd_sampled = cryoem.getslices_interp(curr_fft_image, self.inplane_ops, self.rad).reshape((N_I, N_T))
+        rotd_sampled *= rotc_sampled
+
+        # rotd_sampled += 1.0
+
+        print('total photons of slices_sampled: {}'.format(slices_sampled.sum(axis=1)))
+        print('total photons of rotd_sampled: {}'.format(rotd_sampled.sum(axis=1)))
+
+        np.maximum(slices_sampled, 1e-4, out=slices_sampled)
+        np.maximum(rotd_sampled, 1e-4, out=rotd_sampled)
+        # np.maximum(slices_sampled, 1.0, out=slices_sampled)
+        # np.maximum(rotd_sampled, 1.0, out=rotd_sampled)
 
         return slice_ops, envelope, \
             W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
@@ -452,8 +446,18 @@ class SimpleKernel():
         W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
             self.prep_operators(idx)
 
-        print('max intensity for slices_sampled:', slices_sampled.max())
-        print('max intensity for rotd_sampled:', rotd_sampled.max())
+        TtoF = sincint.gentrunctofull(N=self.N, rad=self.rad)
+        slicing = TtoF.dot(slices_sampled[11]).reshape(self.N, self.N)
+        rotd = TtoF.dot(rotd_sampled[0]).reshape(self.N, self.N)
+        fig, ax = plt.subplots(ncols=2)
+        im_slicing = ax[0].imshow(slicing)
+        fig.colorbar(im_slicing, ax=ax[0])
+        im_rotd = ax[1].imshow(rotd)
+        fig.colorbar(im_rotd, ax=ax[1])
+        # plt.show()
+
+        print('(min, max) intensity for slices_sampled: ({}, {})'.format(slices_sampled.min(), slices_sampled.max()))
+        print('(min, max) intensity for rotd_sampled: ({}, {})'.format(rotd_sampled.min(), rotd_sampled.max()))
         if self.use_angular_correlation:
             # print('max intensity for ac_slices_sampled:', ac_slices_sampled.max())
             # print('max intensity for ac_data_sampled:', ac_data_sampled.max())
@@ -473,7 +477,7 @@ class SimpleKernel():
                     sigma2, g, workspace)
         else:
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
-                py_objective_kernels.doimage_RI(slices_sampled, envelope, \
+                objective_kernels.doimage_RI(slices_sampled, envelope, \
                     rotc_sampled, rotd_sampled, \
                     log_W_I, log_W_R, \
                     sigma2, g, workspace)
@@ -485,15 +489,15 @@ class SimpleKernel():
         
         g = np.zeros(g_size, dtype=self.G_datatype)
 
-        like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, _ = \
-            py_objective_kernels.doimage_RI(slices_sampled, envelope, \
-                rotc_sampled, rotd_sampled, \
-                log_W_I, log_W_R, \
-                sigma2, g, None)
+        # like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, _ = \
+        #     objective_kernels.doimage_RI(slices_sampled, envelope, \
+        #         rotc_sampled, rotd_sampled, \
+        #         log_W_I, log_W_R, \
+        #         sigma2, g, None)
 
-        print("full like:", like)
-        workspace['full_like_cphi_I'] = cphi_I
-        workspace['full_like_cphi_R'] = cphi_R
+        # print("full like:", like)
+        # workspace['full_like_cphi_I'] = cphi_I
+        # workspace['full_like_cphi_R'] = cphi_R
 
         self.cached_workspace[idx] = workspace
         return workspace
@@ -541,26 +545,6 @@ class SimpleKernel():
         print("Top 1 RMSD:", top1_rmsd.mean())
         print("Top {} RMSD: {}".format(cutoff_R, topN_rmsd.mean()))
 
-    # @staticmethod
-    # def get_fft(img, interp_params):
-    #     N = img.shape[0]
-    #     DIM = img.ndim
-    #     zeropad = int(interp_params['zeropad'] * (N / 2))
-    #     Nzp = 2 * zeropad + N
-    #     zp_shape = (Nzp,) * DIM
-    #     img_indices = [slice(zeropad, N + zeropad)] * DIM
-    #     zpimg = np.zeros(zp_shape, dtype=density.real_t)
-    #     zpimg[img_indices] = img
-
-    #     if interp_params['dopremult']:
-    #         premult = cryoops.compute_premultiplier(Nzp, interp_params['kern'], interp_params['kernsize'])
-    #         reshape = [[-1 if j==i else 1 for j in range(DIM)] for i in range(DIM)]
-    #         premult = np.prod([premult.reshape(rs) for rs in reshape])
-    #         zpimg = premult * zpimg
-
-    #     transformed = density.real_to_fspace(zpimg)
-    #     return transformed
-
     @staticmethod
     def plot_distribution(workspace, quad_domain_R, quad_domain_I, correct_ea=None, lognorm=False):
         phi_R = np.asarray(workspace['cphi_R'])
@@ -569,9 +553,10 @@ class SimpleKernel():
         sorted_indices_R = (-phi_R).argsort()
         sorted_indices_I = (-phi_I).argsort()
 
-        cutoff_idx_R = 30
+        cutoff_idx_R = 7
+        cutoff_idx_I = 1
         # cutoff_idx_R = np.diff((-phi_R)[sorted_indices_R]).argmax() + 1
-        cutoff_idx_I = np.diff((-phi_I)[sorted_indices_I]).argmax() + 1
+        # cutoff_idx_I = np.diff((-phi_I)[sorted_indices_I]).argmax() + 1
         potential_R = quad_domain_R.dirs[sorted_indices_R[0:cutoff_idx_R]]
         potential_I = quad_domain_I.theta[sorted_indices_I[0:cutoff_idx_I]]
 
@@ -609,14 +594,14 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
     # model, _ = cryoem.align_density(model)
     # refined_model, _ = cryoem.align_density(refined_model)
 
-    model[model < 1.0] = 1.0
-    refined_model[refined_model < 1.0] = 1.0
+    # model[model < 1.0] = 1.0
+    # refined_model[refined_model < 1.0] = 1.0
     # density_totalmass = 80000
     # if density_totalmass is not None:
     #     model *= density_totalmass / model.sum()
 
     euler_angles = []
-    data_dir = 'data/1AON_xfel_5000_totalmass_05000_oversampling'
+    data_dir = 'data/1AON_xfel_5000_totalmass_10000_oversampling_3'
     with open(os.path.join(data_dir, 'ctf_gt.par')) as par:
         par.readline()
         # 'C                 PHI      THETA        PSI        SHX        SHY       FILM        DF1        DF2     ANGAST'
@@ -630,10 +615,10 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
 
     data_params = {'num_images': 20, 'pixel_size': 2.8,
                    'sigma_noise': 5.0,
-                   'euler_angles': None # euler_angles,
+                   # 'euler_angles': np.deg2rad(euler_angles[0:20]),
                    # 'symmetry': 'C7',
-                   # 'euler_angles': None
-    }
+                   'euler_angles': None
+                  }
     if add_ctf:
         ctf_params = {'akv': 200, 'wgh': 0.07, 'cs': 2.0, 'psize': 2.8, 'dscale': 1, 'bfactor': 500.0,
                       'df1': 31776.1, 'df2': 31280.3, 'angast': 0.82}
@@ -641,7 +626,7 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
         ctf_params = None
     cryodata = SimpleDataset(model, data_params, ctf_params)
 
-    cparams = {'max_frequency': 0.02, 'learn_like_envelope_bfactor': 500}
+    cparams = {'max_frequency': 0.04, 'learn_like_envelope_bfactor': 500}
     print("Using angular correlation patterns:", use_angular_correlation)
     sk = SimpleKernel(cryodata, use_angular_correlation=use_angular_correlation)
     sk.set_data(refined_model, cparams)
@@ -653,10 +638,10 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
         sk.plot_distribution(workspace, sk.quad_domain_R, sk.quad_domain_I,
                              correct_ea=cryodata.euler_angles[i], lognorm=False)
 
-        workspace['cphi_R'] = workspace['full_like_cphi_R']
-        workspace['cphi_I'] = workspace['full_like_cphi_I']
-        sk.plot_distribution(workspace, sk.quad_domain_R, sk.quad_domain_I,
-                             correct_ea=cryodata.euler_angles[i], lognorm=False)
+        # workspace['cphi_R'] = workspace['full_like_cphi_R']
+        # workspace['cphi_I'] = workspace['full_like_cphi_I']
+        # sk.plot_distribution(workspace, sk.quad_domain_R, sk.quad_domain_I,
+        #                      correct_ea=cryodata.euler_angles[i], lognorm=False)
 
     # sk.plot_rmsd()
 

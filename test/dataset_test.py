@@ -10,6 +10,7 @@ except ImportError:
     import pickle
 
 import numpy as np
+from scipy.interpolate import interpn
 from matplotlib import pyplot as plt
 
 from cryoio.imagestack import MRCImageStack, FourierStack
@@ -17,6 +18,7 @@ from cryoio.ctfstack import CTFStack
 from cryoio.dataset import CryoDataset
 from cryoio import ctf
 import cryoops
+import cryoem
 import density
 import geometry
 from symmetry import get_symmetryop
@@ -31,8 +33,8 @@ from noise_test import plot_noise_histogram, plot_stack_noise
 
 class SimpleDataset():
     def __init__(self, model, dataset_params, ctf_params,
-                 interp_params={'kern': 'lanczos', 'kernsize': 8.0, 'zeropad': 1, 'dopremult': True},
-                 try_load_cache=True):
+                 interp_params={'kern': 'lanczos', 'kernsize': 4.0, 'zeropad': 0, 'dopremult': True},
+                 load_cache=True):
         assert isinstance(model, np.ndarray), "Unexpected data type for input model"
 
         self.dataset_params = dataset_params
@@ -74,19 +76,19 @@ class SimpleDataset():
             self.use_ctf = False
             ctf_map = np.ones((N**2,), dtype=density.real_t)
 
-        sigma_noise = float(dataset_params.get('sigma_noise', 25.0))
         kernel = 'lanczos'
         ksize = 6
         rad = 0.95
-        premult = cryoops.compute_premultiplier(N, kernel, ksize)
+        # premult = cryoops.compute_premultiplier(N, kernel, ksize)
         TtoF = sincint.gentrunctofull(N=N, rad=rad)
-        premulter =   premult.reshape((1, 1, -1)) \
-                    * premult.reshape((1, -1, 1)) \
-                    * premult.reshape((-1, 1, 1))
+        base_coords = geometry.gencoords(N, 2, rad)
+        # premulter =   premult.reshape((1, 1, -1)) \
+        #             * premult.reshape((1, -1, 1)) \
+        #             * premult.reshape((-1, 1, 1))
         # fM = density.real_to_fspace(premulter * model)
         fM = model
 
-        # if try_load_cache:
+        # if load_cache:
         #     try:
         print("Generating Dataset ... :")
         tic = time.time()
@@ -95,14 +97,16 @@ class SimpleDataset():
             R = geometry.rotmat3D_EA(*ea)[:, 0:2]
             slop = cryoops.compute_projection_matrix(
                 [R], N, kernel, ksize, rad, 'rots')
-            D = slop.dot(fM.reshape((-1,)))
-            intensity = ctf_map.reshape((N, N)) * np.abs(TtoF.dot(D)).reshape((N, N))
-            # intensity = np.random.poisson(intensity)
-            intensity[intensity < 1.0] = 1.0
+            # D = slop.dot(fM.reshape((-1,)))
+            rotated_coords = R.dot(base_coords.T).T + int(N/2)
+            D = interpn((np.arange(N),) * 3, fM, rotated_coords)
+            
+            intensity = ctf_map.reshape((N, N)) * TtoF.dot(D).reshape((N, N))
+            np.maximum(1e-6, intensity, out=intensity)
+            intensity = np.float_( np.random.poisson(intensity) )
             imgdata[i] = np.require(intensity, dtype=density.real_t)
         self.imgdata = imgdata
         print("  cost {} seconds.".format(time.time()-tic))
-
 
         self.set_transform(interp_params)
         # self.prep_processing()
@@ -186,9 +190,9 @@ class SimpleDataset():
         self.transformed = {}
         self.interp_params = interp_params
 
-        zeropad = interp_params.get('zeropad', 1)
+        zeropad = interp_params.get('zeropad', 0)
         kernel = interp_params.get('kern', 'lanczos')
-        kernsize = interp_params.get('kernsize', 8)
+        kernsize = interp_params.get('kernsize', 4)
 
         self.zeropad = int(zeropad * (self.get_num_pixels() / 2))
         Nzp = 2 * self.zeropad + self.num_pixels
@@ -234,8 +238,8 @@ def dataset_loading_test(params, visualize=False):
     psize = params['resolution']
     imgstk = MRCImageStack(imgpath, psize)
 
-    if params.get('float_images', True):
-        imgstk.float_images()
+    # if params.get('float_images', True):
+    #     imgstk.float_images()
 
     ctfpath = params['ctfpath']
     mscope_params = params['microscope_params']
@@ -244,8 +248,8 @@ def dataset_loading_test(params, visualize=False):
     cryodata = CryoDataset(imgstk, ctfstk)
 
     cryodata.compute_noise_statistics()
-    if params.get('window_images',True):
-        imgstk.window_images()
+    # if params.get('window_images',True):
+    #     imgstk.window_images()
     cryodata.divide_dataset(params['minisize'], params['test_imgs'],
                             params['partition'], params['num_partitions'], params['random_seed'])
     # cryodata.set_datasign(params.get('datasign', 'auto'))

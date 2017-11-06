@@ -24,12 +24,12 @@
 
 {
 	'interp_kernel_R':	"'lanczos'",
-	'interp_kernel_size_R':	4,
+	'interp_kernel_size_R':	6,
 	'interp_zeropad_R':	0,
 	'interp_premult_R':	True,
 
 	'interp_kernel_I':	"'lanczos'",
-	'interp_kernel_size_I':	4,
+	'interp_kernel_size_I':	6,
 	'interp_zeropad_I':	0,
 	'interp_premult_I':	True,
 

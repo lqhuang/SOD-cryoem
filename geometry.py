@@ -163,7 +163,7 @@ def gencoords(N, d, rad=None, truncmask=False, trunctype='circ'):
  
     return c, truncc, trunkmask
  
- def gen_trunc_mask(N, d, rad_freq, mask_freq, psize=1):
+def gen_trunc_mask(N, d, rad_freq, mask_freq, psize=1):
     rad = rad_freq * 2.0 * psize
     freqs = gencoords(N, d, rad) / (N * psize)
     freqs_radius = np.sqrt( (freqs ** 2).sum(axis=1) )

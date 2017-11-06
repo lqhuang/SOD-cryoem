@@ -47,11 +47,13 @@ def density2params(M,fM,xtype,grad_transform = False,precond = None):
         else:
             x0 = M if precond is None else M / precond
     elif xtype == 'complex':
+        raise NotImplementedError()
         if grad_transform:
             x0 = fM if precond is None else fM * precond
         else:
             x0 = fM if precond is None else fM / precond
     elif xtype == 'complex_coeff':
+        raise NotImplementedError()
         if grad_transform:
             pfM = fM if precond is None else fM * precond
         else:
@@ -59,9 +61,9 @@ def density2params(M,fM,xtype,grad_transform = False,precond = None):
 
         x0 = np.empty((2*fM.size,),dtype=density.real_t)
         x0[0:fM.size] = pfM.real.reshape((-1,))
-        raise NotImplementedError('???? imag')
         x0[fM.size:] = pfM.imag.reshape((-1,))
     elif xtype == 'complex_herm_coeff':
+        raise NotImplementedError()
         assert precond is None, 'Unimplemented'
 
         N = fM.shape[0]
@@ -82,7 +84,6 @@ def density2params(M,fM,xtype,grad_transform = False,precond = None):
 
         x0 = np.empty((2*NC*N**2,),dtype=density.real_t)
         x0[0:NC*N**2] = herm_freqs.real.reshape((-1,))
-        raise NotImplementedError('???? imag')
         x0[NC*N**2:] = herm_freqs.imag.reshape((-1,))
  
     return x0
@@ -94,10 +95,12 @@ def param2density(x,xtype,sz,precond = None):
         if precond is not None:
             M = M * precond
     elif xtype == 'complex':
+        raise NotImplementedError()
         M, fM = None, x.reshape(sz)
         if precond is not None:
             fM = fM * precond
     elif xtype == 'complex_coeff':
+        raise NotImplementedError()
         M, fM = None, density.empty_cplx(sz)
 
         fM.real = x[0:fM.size].reshape(sz)
@@ -106,6 +109,7 @@ def param2density(x,xtype,sz,precond = None):
         if precond is not None:
             fM *= precond
     elif xtype == 'complex_herm_coeff':
+        raise NotImplementedError()
         assert precond is None, 'Unimplemented'
 
         M, fM = None, density.empty_cplx(sz)
@@ -197,6 +201,7 @@ class ObjectiveWrapper:
             return logP,outputs
 
         if self.xtype in ['complex_coeff','complex_herm_coeff'] :
+            raise NotImplementedError()
             if cargs.get('all_grads',False):
                 new_dlogPs = []
                 for adlogP in outputs['all_dlogPs']:
@@ -456,7 +461,7 @@ class CryoOptimizer(BackgroundWorker):
             if M.shape != 3*(self.cryodata.N,):
                 M = cryoem.resize_ndarray(M,3*(self.cryodata.N,),axes=(0,1,2))
         else:
-            init_seed = self.cparams.get('init_random_seed',0)  + self.cparams.get('partition',0)
+            init_seed = self.cparams.get('init_random_seed', np.random.randint(10))  + self.cparams.get('partition',0)
             print("Randomly generating initial density (init_random_seed = {0})...".format(init_seed)); sys.stdout.flush()
             tic = time.time()
             M = cryoem.generate_phantom_density(self.cryodata.N, 0.95*self.cryodata.N/2.0, \
@@ -473,12 +478,12 @@ class CryoOptimizer(BackgroundWorker):
         # cryoem.align_density(M)
         # print("done in {0:.2f}s".format(time.time() - tic))
 
-        M_totalmass = 5000
+        M_totalmass = 500000
         M *= M_totalmass / M.sum()
         N = M.shape[0]
 
         # oversampling
-        zeropad = 1
+        zeropad = 2
         zeropad_size = int(zeropad * (N / 2))
         zp_N = zeropad_size * 2 + N
         zpm_shape = (zp_N,) * 3

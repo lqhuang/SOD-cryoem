@@ -22,9 +22,9 @@ cdef double my_logsumexp(unsigned int N, double *a) nogil:
 
     a_sum = 0
     for i in range(N):
-        # diff = a[i] - a_max
-        # if diff > -72.0:  # exp(-72) = 5.3801861600211382e-32
-        a_sum += exp(a[i] - a_max)
+        diff = a[i] - a_max
+        if diff > -36.0:  # exp(-36) = 2.3195228302435696e-16
+            a_sum += exp(a[i] - a_max)
 
     return a_max + log(a_sum)
 
@@ -36,15 +36,15 @@ cdef double my_logaddexp(double a, double b) nogil:
         tmp = a-b
         
         if tmp > 0:
-            # if tmp > 72.0:
-            #     return a
-            # else:
-            return a + log1p(exp(-tmp))
+            if tmp > 36.0:
+                return a
+            else:
+                return a + log1p(exp(-tmp))
         elif tmp <= 0:
-            # if tmp < -72.0:
-            #     return b
-            # else:
-            return b + log1p(exp(tmp))
+            if tmp < -36.0:
+                return b
+            else:
+                return b + log1p(exp(tmp))
         else:
             return tmp
 
@@ -188,8 +188,8 @@ def doimage_RI(n.ndarray[n.float32_t, ndim=2] slices, # Slices of 3D volume (N_R
                 # Compute the error at each frequency
                 tmp = 0  # temp variable for summation of sigma2_I
                 for t in xrange(N_T):
-                    cproj = ctf[i,t]*slices[r,t] + 1.0 - ctf[i,t]
-                    cim = ctf[i,t]*d[i,t] + 1.0 - ctf[i,t]
+                    cproj = ctf[i,t] * slices[r,t] + 1.0 - ctf[i,t]
+                    cim = ctf[i,t] * d[i,t] + 1.0 - ctf[i,t]
 
                     correlation_I[i,t] = cproj * cim  # + cproj.imag*cim.imag
                     power_I[i,t] = cproj * cproj  # + cproj.imag*cproj.imag
@@ -197,23 +197,25 @@ def doimage_RI(n.ndarray[n.float32_t, ndim=2] slices, # Slices of 3D volume (N_R
                     # Compute the gradient
                     if computeGrad:
                         if use_envelope:
-                            # g_I[i,t] = cim / (envelope[t]*cproj) - 1.0
-                            g_I[i,t] = (envelope[t]*cproj) / cim  - 1.0
+                            # g_I[i,t] = - (cim - cproj)
+                            g_I[i,t] =  - (cim / (envelope[t]*cproj) - 1.0)
+                            # g_I[i,t] = (envelope[t]*cproj) / cim  - 1.0
                         else:
-                            # g_I[i,t] = cim / cproj - 1.0
-                            g_I[i,t] = cproj / cim - 1.0
-                        g_I[i,t] = - ctf[i,t] * g_I[i,t]
-                        
+                            # g_I[i,t] = - (cim - cproj)
+                            g_I[i,t] =  - (cim / cproj - 1.0)
+                            # g_I[i,t] = cproj / cim - 1.0
+                        g_I[i,t] = ctf[i,t] * g_I[i,t]
+
                     # Compute the log likelihood
                     if use_whitenoise:
-                        # sigma2_I[i,t] = ctf[i,t] * (cim * log(cproj) - cproj)
-                        sigma2_I[i,t] = ctf[i,t] * (cproj * log(cim) - cim)
+                        sigma2_I[i,t] = ctf[i,t] * (cim * log(cproj) - cproj)
+                        # sigma2_I[i,t] = ctf[i,t] * (cproj * log(cim) - cim)
                         tmp += sigma2_I[i,t]
                     else:
-                        # sigma2_I[i,t] = ctf[i,t] * (cim * log(cproj) - cproj)
-                        sigma2_I[i,t] = ctf[i,t] * (cproj * log(cim) - cim)
+                        sigma2_I[i,t] = ctf[i,t] * (cim * log(cproj) - cproj)
+                        # sigma2_I[i,t] = ctf[i,t] * (cproj * log(cim) - cim)
                         tmp += sigma2_I[i,t] / sigma2_coloured[t]
-                e_I[i] = div_in*tmp + logW_I[i]                        
+                e_I[i] = div_in*tmp + logW_I[i]
 
             etmp = my_logsumexp(N_I, <double*>e_I.data)
             e_R[r] = etmp + logW_R[r]

@@ -13,7 +13,6 @@ import geometry
 import cryoops
 import cryoem
 import density
-import geometry
 
 import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint

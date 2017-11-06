@@ -100,8 +100,8 @@ def compute_premultiplier(N, kernel, kernsize, scale=512):
     else:
         premult = 1.0 / (N * sk[(koffset - krange - 1):(koffset + krange)])
 
-    return premult
-    # return np.ones_like(premult, dtype=premult.dtype)
+    # return premult
+    return np.ones_like(premult, dtype=premult.dtype)
 
 
 if __name__ == '__main__':

@@ -1,9 +1,11 @@
 from __future__ import print_function, division
 
 import numpy as np
-from geometry import gencoords
+from scipy.interpolate import RegularGridInterpolator, interpn
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
+
+from geometry import gencoords
 
 import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sparsemul
@@ -210,6 +212,76 @@ def getslices(V, SLOP, res=None):
         sparsemul.spdot(SLOP, vV.imag, res.imag)
     else:
         sparsemul.spdot(SLOP, vV, res)
+
+    return res
+
+def getslices_interp(V, Rs, rad, res=None):
+    ndim = V.ndim
+    assert ndim > 1
+    num_slices = len(Rs)
+    # if ndim == 2:
+    #     assert Rs.shape[1] == 2
+    # elif ndim == 3:
+    #     assert Rs.shape[1] == 3
+    # Rs.shape[2] == 2
+    N = V.shape[0]
+    center = int(N/2)
+    coords = gencoords(N, 2, rad)
+    N_T = coords.shape[0]
+
+    grid = (np.arange(N),) * ndim
+    slicing_func = RegularGridInterpolator(grid, V, bounds_error=False, fill_value=0.0)
+
+    if res is None:
+        res = np.zeros((num_slices, N_T), dtype=V.dtype)
+    else:
+        assert res.shape[0] == Rs.shape[0]
+        assert res.dtype == V.dtype
+        res[:] = 0
+
+    for i, R in enumerate(Rs):
+        rotated_coords = R.dot(coords.T).T + center
+        res[i] = slicing_func(rotated_coords)
+        # res[i] = interpn(grid, V, rotated_coords)
+        # res[i] = spinterp.map_coordinates(V, rotated_coords.T)
+
+    return res
+
+
+def merge_slices(slices, Rs, N, rad, res=None):
+    center = int(N/2)
+    coords = gencoords(N, 2, rad)
+    assert slices.shape[1] == coords.shape[0]
+
+    if res is None:
+        res = np.zeros((N,) * 3, dtype=np.float32)
+    else:
+        assert res.shape == (N,) * 3
+        assert res.dtype == slices.dtype
+        res[:] = 0.0
+    model_weight = np.zeros((N,) * 3)
+
+    for i, R in enumerate(Rs):
+        curr_slices = slices[i, :]
+
+        for j, xy in enumerate(coords):
+            voxel_intensity = curr_slices[j]
+
+            rot_coord = R.dot(xy.T).reshape(1, -1)[0] + center
+            rot_coord = np.int_(np.round(rot_coord))
+
+            in_x = rot_coord[0] >= 0 and rot_coord[0] < N
+            in_y = rot_coord[1] >= 0 and rot_coord[1] < N
+            in_z = rot_coord[2] >= 0 and rot_coord[2] < N
+
+            if in_x and in_y and in_z:
+                index_coord = tuple(rot_coord)
+                model_voxel_intensity = res[index_coord]
+                model_weight[index_coord] += 1
+                voxel_weight = model_weight[index_coord]
+                delta_intensity = voxel_intensity - model_voxel_intensity
+                model_voxel_intensity += delta_intensity / voxel_weight
+                res[index_coord] = model_voxel_intensity
 
     return res
 

@@ -23,6 +23,7 @@ except ImportError:
     import pickle  # python 3
 
 import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 import pyximport; pyximport.install(
     setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
@@ -36,7 +37,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
 
     N = M.shape[0]
     rad = 0.95
-    M_totalmass = 5000
+    M_totalmass = 500000
     kernel = 'lanczos'
     ksize = 6
 
@@ -77,9 +78,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     zp_fM = V.real ** 2 + V.imag ** 2
     fM = zp_fM[zpm_slices]
 
-    # np.save('3D_mask_0.015', mask_3d_outlier)
-    # mrc.writeMRC('particle/1AON_fM_totalmass_{}_oversampling_1.mrc'.format(str(int(M_totalmass))).zfill(5), fM, psz=2.8)
-    # exit()
+    # mrc.writeMRC('particle/EMD6044_fM_totalmass_{}_oversampling_{}.mrc'.format(str(int(M_totalmass)).zfill(5), zeropad), fM, psz=2.8)
 
     print("Generating data...")
     sys.stdout.flush()
@@ -88,6 +87,8 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     pardata = {'R': []}
 
     prevctfI = None
+    coords = geometry.gencoords(N, 2, rad)
+    slicing_func = RegularGridInterpolator((np.arange(N),)*3, fM, bounds_error=False, fill_value=0.0)
     for i, srcctfI in enumerate(Cmap):
         ellapse_time = time.time() - tic
         remain_time = float(N_D - i) * ellapse_time / max(i, 1)
@@ -111,15 +112,19 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         EA[2] = psi
 
         R = geometry.rotmat3D_EA(*EA)[:, 0:2]
-        slop = cryoops.compute_projection_matrix(
-            [R], N, kernel, ksize, rad, 'rots')
+        # slop = cryoops.compute_projection_matrix(
+        #     [R], N, kernel, ksize, rad, 'rots')
+        # D = slop.dot(fM.reshape((-1,)))
 
-        D = slop.dot(fM.reshape((-1,)))
+        rotated_coords = R.dot(coords.T).T + int(N/2)
+        D = slicing_func(rotated_coords)
+
         intensity = TtoF.dot(D)
-        np.maximum(intensity, 1e-6, out=intensity)
+        np.maximum(intensity, 0.0, out=intensity)
 
         img = np.float_(np.random.poisson(intensity.reshape(N, N)), dtype=density.real_t)
-        # np.maximum(1.0, img, out=img)
+        img = intensity.reshape(N, N)
+        np.maximum(1e-8, img, out=img)
 
         imgdata[i] = np.require(img * C + 1.0 - C, dtype=density.real_t)
         genctf_stack.add_img(genctfI,

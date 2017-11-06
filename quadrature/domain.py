@@ -98,7 +98,7 @@ class FixedSphereDomain(FixedDirectionalDomain):
         else:
             dirs = self.dirs[inds]
 
-        return cops.compute_projection_matrix(dirs,sym=self.sym,**interp_params)
+        return cops.compute_projection_matrix(dirs, sym=self.sym, onlyRs=True, **interp_params)
     
     def get_symmetry_order(self):
         if self.sym is None:
@@ -127,7 +127,8 @@ class FixedCircleDomain(FixedDirectionalDomain):
         rad = interp_params['rad']
         zeropad = interp_params.get('zeropad',0)
         N_src = N if zeropad == 0 else N + 2*int(zeropad*(N/2))
-        return cops.compute_inplanerot_matrix(theta,N,kern,kernsize,rad,N_src, onlyRs = interp_params.get('onlyRs', False))
+        return cops.compute_inplanerot_matrix(theta, N, kern, kernsize, rad, N_src,
+                                              onlyRs = interp_params.get('onlyRs', True))
     
 class FixedSO3Domain():
     def __init__(self,dirs,thetas,res,sym=None):
@@ -147,7 +148,8 @@ class FixedSO3Domain():
             N_I = len(self.thetas)
             Rs = np.array([geometry.rotmat3D_dir(self.dirs[i/N_I],self.thetas[np.mod(i,N_I)])[:,0:2] for i in inds])
 
-        return cops.compute_projection_matrix(Rs,sym=self.sym,projdirtype='rots',**interp_params)
+        return cops.compute_projection_matrix(Rs, sym=self.sym, projdirtype='rots',
+                                              onlyRs=True, **interp_params)
 
     def get_symmetry_order(self):
         if self.sym is None:

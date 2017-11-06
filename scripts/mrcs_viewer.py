@@ -16,15 +16,17 @@ from matplotlib import pyplot as plt
 from numpy import unravel_index, log, maximum
 
 from cryoio import mrc
+from geometry import gen_dense_mask
 
 
-def plot_projs(mrcs_files, log_scale=True):
-    plot_randomly = True
+def plot_projs(mrcs_files, log_scale=True, plot_randomly=True):
+
 
     for mrcs in mrcs_files:
         image_stack = mrc.readMRCimgs(mrcs, 0)
         size = image_stack.shape
         N = size[0]
+        mask = gen_dense_mask(N, 2, 0.015, psize=2.8)
         print('image size: {0}x{1}, number of images: {2}'.format(*size))
         print('Select indices randomly:', plot_randomly)
         fig, axes = plt.subplots(3, 3, figsize=(12.9, 9.6))
@@ -36,9 +38,9 @@ def plot_projs(mrcs_files, log_scale=True):
                 num = i
             print('index:', num)
             if log_scale:
-                img = log(maximum(image_stack[:, :, num], 1e-6))
+                img = log(maximum(image_stack[:, :, num], 1e-6)) * mask
             else:
-                img = image_stack[:, :, num]
+                img = image_stack[:, :, num] * mask
             im = ax.imshow(img, origin='lower')  # cmap='Greys'
             if row == 2:
                 ax.set_xticks([0, int(N/4.0), int(N/2.0), int(N*3.0/4.0), int(N-1)])
@@ -62,10 +64,14 @@ if __name__ == '__main__':
     parser.add_argument("mrcs_files", help="list of mrcs files.", nargs='+')
     parser.add_argument("-l", "--log_scale", help="show image in log scale.",
                         action="store_true")
+    parser.add_argument("-r", "--plot_randomly", help="plot image with random index.",
+                        action="store_true")
     args = parser.parse_args()
 
     log_scale = args.log_scale
     mrcs_files = args.mrcs_files
+    plot_randomly = args.plot_randomly
     print('mrcs_files:', mrcs_files)
     print('log_scale', log_scale)
-    plot_projs(mrcs_files, log_scale=log_scale)
+    print('plot_randomly', plot_randomly)
+    plot_projs(mrcs_files, log_scale=log_scale, plot_randomly=plot_randomly)

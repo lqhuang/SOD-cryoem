@@ -15,7 +15,7 @@ import cryoem, quadrature, density, cryoops
 
 from symmetry import get_symmetryop
 from geometry import gencoords
-from cryoem import getslices
+from cryoem import getslices_interp
 
 from notimplemented import correlation
 from scipy.stats import entropy
@@ -199,7 +199,8 @@ class UnknownRSLikelihood(Objective):
         
         if compute_gradient and self.kernel.slice_premult is not None:
             tic_record = time.time()
-            ret = (ret[0],self.kernel.slice_premult * density.fspace_to_real(ret[1]),ret[2])
+            # ret = (ret[0],self.kernel.slice_premult * density.fspace_to_real(ret[1]),ret[2])
+            ret = (ret[0],ret[1],ret[2])
             ret[-1]['like_timing']['premult'] = pmtime + time.time() - tic_record
             
         ret[-1]['like_timing']['total'] = time.time() - tic_start
@@ -791,7 +792,8 @@ class UnknownRSKernel:
                         slices_sampled = self.precomp_slices[samples_R]
                 else:
                     slice_ops = self.quad_domain_RI.compute_operator(self.interp_params,samples_R)
-                    slices_sampled = getslices(fM.reshape((-1,)), slice_ops).reshape((N_R_sampled,self.N_T))
+                    slices_sampled = getslices_interp(fM, slice_ops, self.rad).reshape((N_R_sampled,self.N_T))
+                    # slices_sampled += 1.0
                 
                 rotd_sampled = Img[self.truncmask.reshape(Img.shape)].reshape((N_I_sampled,self.N_T))
                 rotc_sampled = cCTF.compute(self.trunc_freq).reshape((1,self.N_T))
@@ -805,7 +807,8 @@ class UnknownRSKernel:
                         slices_sampled = self.precomp_slices[samples_R]
                 else:
                     slice_ops = self.quad_domain_R.compute_operator(self.slice_interp,samples_R)
-                    slices_sampled = getslices(fM.reshape((-1,)), slice_ops).reshape((N_R_sampled,self.N_T))
+                    slices_sampled = getslices_interp(fM, slice_ops, self.rad).reshape((N_R_sampled,self.N_T))
+                    # slices_sampled += 1.0
                 if res is not None:
                     res['kern_timing']['prep_slice'][idx] = time.time() - tic 
 
@@ -820,12 +823,13 @@ class UnknownRSKernel:
                 # Generate the rotated versions of the current image
                 if self.using_precomp_inplane:
                     if samples_I is None:
-                        rotd_sampled = getslices(Img,self.inplane_ops).reshape((N_I_sampled,self.N_T))
+                        rotd_sampled = getslices_interp(Img, self.inplane_ops, self.rad).reshape((N_I_sampled,self.N_T))
                     else:
-                        rotd_sampled = getslices(Img,self.inplane_ops).reshape((self.N_I,self.N_T))[samples_I]
+                        rotd_sampled = getslices_interp(Img, self.inplane_ops, self.rad).reshape((self.N_I,self.N_T))[samples_I]
                 else:
                     inplane_ops = self.quad_domain_I.compute_operator(self.inplane_interp,samples_I)
-                    rotd_sampled = getslices(Img,inplane_ops).reshape((N_I_sampled,self.N_T))
+                    rotd_sampled = getslices_interp(Img, inplane_ops, self.rad).reshape((N_I_sampled,self.N_T))
+                    # slices_sampled += 1.0
                 if res is not None:
                     res['kern_timing']['prep_rot_img'][idx] = time.time() - tic 
         else:
@@ -835,28 +839,24 @@ class UnknownRSKernel:
             rotc_sampled = None
             rotd_sampled = None
 
-        if self.sampler_S is not None:
-            return slice_ops, envelope, \
-                W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
-                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
-                W_S_sampled, sampleinfo_S, S_sampled
-        else:
-            # check invalid value ( < 1.0 )
-            # print("number of slices_sampled < 1.0:", (slices_sampled<1.0).sum(axis=1).mean())
-            # print("min of slices_sampled:", slices_sampled.min())
-            # print("slices_sampled", rotc_sampled[0] * slices_sampled[0])
-            np.maximum(1e-6, slices_sampled, out=slices_sampled)
 
-            # invalid_rotd_sampled = rotd_sampled < 1.0
-            # print("number of invalid rotd_sampled", invalid_rotd_sampled.sum(axis=1).mean())
-            # rotd_sampled = rotc_sampled * rotd_sampled + 1.0 - rotc_sampled
-            # print("number of rotd_sampled < 1.0", rotd_sampled.min())
-            # print("rotd_sampled", rotc_sampled[0] * rotd_sampled[0])
-            np.maximum(1e-6, rotd_sampled, out=rotd_sampled)
+        # check invalid value ( < 1.0 )
+        # print("number of slices_sampled < 1.0:", (slices_sampled<1.0).sum(axis=1).mean())
+        # print("min of slices_sampled:", slices_sampled.min())
+        # print("slices_sampled", rotc_sampled[0] * slices_sampled[0])
+        np.maximum(1e-4, slices_sampled, out=slices_sampled)
 
-            return slice_ops, envelope, \
-                W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
-                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled
+        # invalid_rotd_sampled = rotd_sampled < 1.0
+        # print("number of invalid rotd_sampled", invalid_rotd_sampled.sum(axis=1).mean())
+        # rotd_sampled = rotc_sampled * rotd_sampled + 1.0 - rotc_sampled
+        # print("number of rotd_sampled < 1.0", rotd_sampled.min())
+        # print("rotd_sampled", rotc_sampled[0] * rotd_sampled[0])
+        np.maximum(1e-4, rotd_sampled, out=rotd_sampled)
+        # rotd_sampled += 1.0
+
+        return slice_ops, envelope, \
+            W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
+            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled
             
     def store_results(self, idx, isw, \
                       cphi_R, sampleinfo_R, \
