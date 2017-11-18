@@ -96,6 +96,6 @@ Rs = np.vstack([geometry.rotmat3D_EA(*ea)[:, 0:2].reshape((1, 3, 2)) for ea in e
 
 
 
-model = cryoem.merge_slices(slices, Rs, N, rad)
+model = cryoem.merge_slices(slices, Rs, N, rad, mask_rad=None)
 
 mrc.writeMRC('particle/merge.mrc', model, psz=2.8)

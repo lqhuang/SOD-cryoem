@@ -31,13 +31,13 @@ import sincint
 
 def genphantomdata(N_D, phantompath, ctfparfile):
     mscope_params = {'akv': 200, 'wgh': 0.07,
-                     'cs': 2.0, 'psize': 2.8, 'bfactor': 500.0}
+                     'cs': 2.0, 'psize': 3.0, 'bfactor': 500.0}
 
     M = mrc.readMRC(phantompath)
 
     N = M.shape[0]
     rad = 0.95
-    M_totalmass = 500000
+    M_totalmass = 2000000
     kernel = 'lanczos'
     ksize = 6
 
@@ -64,7 +64,10 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         M *= M_totalmass / M.sum()
 
     # oversampling
-    zeropad = 1
+    oversampling_factor = 6
+    psize = psize * oversampling_factor
+
+    zeropad = oversampling_factor - 1
     zeropad_size = int(zeropad * (N / 2))
     zp_N = zeropad_size * 2 + N
     zpm_shape = (zp_N,) * 3

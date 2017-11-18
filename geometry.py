@@ -162,6 +162,41 @@ def gencoords(N, d, rad=None, truncmask=False, trunctype='circ'):
         truncc = c
  
     return c, truncc, trunkmask
+
+@memoize
+def gencoords_centermask(N, d, rad=None, mask_rad=None, truncmask=False, trunctype='circ'):
+    """ generate coordinates of all points in an NxN..xN grid with d dimensions 
+    coords in each dimension are [-N/2, N/2) 
+    N should be even"""
+    if not truncmask:
+        _, truncc, _ = gencoords_centermask(N, d, rad, mask_rad, True)
+        return truncc
+
+    c = gencoords_base(N, d)
+
+    if rad is not None and mask_rad is None:
+        if trunctype == 'circ':
+            r2 = np.sum(c**2, axis=1)
+            trunkmask = r2 < (rad*N/2.0)**2
+        elif trunctype == 'square':
+            r = np.max(np.abs(c), axis=1)
+            trunkmask = r < (rad*N/2.0)
+
+        truncc = c[trunkmask,:]
+    elif rad is not None and mask_rad is not None:
+        if trunctype == 'circ':
+            r2 = np.sum(c**2, axis=1)
+            trunkmask = np.logical_and(r2 > (mask_rad*N/2.0)**2, r2 < (rad*N/2.0)**2)
+        elif trunctype == 'square':
+            r = np.max(np.abs(c), axis=1)
+            trunkmask = np.logical_and(r2 > (mask_rad*N/2.0), r < (rad*N/2.0))
+
+        truncc = c[trunkmask,:]
+    else:
+        trunkmask = np.ones((c.shape[0],), dtype=np.bool8)
+        truncc = c
+ 
+    return c, truncc, trunkmask
  
 def gen_trunc_mask(N, d, rad_freq, mask_freq, psize=1):
     rad = rad_freq * 2.0 * psize

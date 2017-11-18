@@ -226,7 +226,8 @@ class CryoOptimizer(BackgroundWorker):
         cepoch = self.cryodata.get_epoch(frac=True)
         epoch = self.cryodata.get_epoch()
         num_data = self.cryodata.N_D_Train
-        sigma = np.sqrt(np.mean(res['Evar_like']))
+        # sigma = np.sqrt(np.mean(res['Evar_like']))
+        sigma = np.sqrt(max(0, np.mean(res['Evar_like'])))
         sigma_prior = np.sqrt(np.mean(res['Evar_prior']))
         
         self.ostream('  {0} Batch:'.format(name))
@@ -483,7 +484,8 @@ class CryoOptimizer(BackgroundWorker):
         N = M.shape[0]
 
         # oversampling
-        zeropad = 2
+        oversampling_factor = self.params['oversampling_factor']
+        zeropad = oversampling_factor - 1
         zeropad_size = int(zeropad * (N / 2))
         zp_N = zeropad_size * 2 + N
         zpm_shape = (zp_N,) * 3
@@ -497,6 +499,9 @@ class CryoOptimizer(BackgroundWorker):
             premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * zp_M)
         M = (V.real ** 2 + V.imag ** 2)[zpm_slices]
         assert M.shape == (N, N, N)
+
+        mask_freq = self.cparams.get('mask_freq', None)
+        mask_3D = geometry.gen_dense_mask(N, 3, mask_freq, psize=self.cparams['pixel_size'])
 
         # apply the symmetry operator
         init_sym = get_symmetryop(self.cparams.get('init_symmetry',self.cparams.get('symmetry',None)))
@@ -528,7 +533,7 @@ class CryoOptimizer(BackgroundWorker):
         tic = time.time()
         print("Saving initial model..."); sys.stdout.flush()
         init_model_fname = os.path.join(self.expbase, 'init_model.mrc')
-        writeMRC(init_model_fname, M, psz=self.cparams['pixel_size'])
+        writeMRC(init_model_fname, M * mask_3D, psz=self.cparams['pixel_size'])
         print("done in {0:.2f}s".format(time.time() - tic))
 
         self.M = np.require(M,dtype=density.real_t)

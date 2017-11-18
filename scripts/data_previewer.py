@@ -20,30 +20,37 @@ def gen_slices(model_files, fspace=False, log_scale=True):
     for model in model_files:
         M = mrc.readMRC(model)
         N = M.shape[0]
-        mask_freq = 0.010
-        mask = geometry.gen_dense_mask(N, 2, mask_freq, psize=2.8)
         print('model size: {0}x{0}x{0}'.format(N))
 
         if fspace:
             fM = M
         else:
-            M_totalmass = 500000
+            M_totalmass = 2000000
             M *= M_totalmass / M.sum()
 
-            zeropad = 1
+            oversampling_factor = 6
+            zeropad = oversampling_factor - 1  # oversampling factor = zeropad + 1
+
+            psize = 3.0 * oversampling_factor
+            mask_freq = 0.01
+            mask = geometry.gen_dense_mask(N, 2, mask_freq, psize=psize)
+            # mask = None
+
             zeropad_size = int(zeropad * (N / 2))
             zp_N = zeropad_size * 2 + N
             zpm_shape = (zp_N,) * 3
             zp_M = np.zeros(zpm_shape, dtype=density.real_t)
-            zpm_slices = (slice( zeropad_size, (N + zeropad_size) ),) * 3
-            zp_M[zpm_slices] = M
+            zpm_slicer = (slice( zeropad_size, (N + zeropad_size) ),) * 3
+            zp_M[zpm_slicer] = M
             zp_fM = density.real_to_fspace(zp_M)
-            fM = zp_fM[zpm_slices]
+            fM = zp_fM[zpm_slicer]
             fM = fM.real ** 2 + fM.imag ** 2
 
-            mask_3D = geometry.gen_dense_mask(N, 3, mask_freq, psize=2.8)
+            mask_3D = geometry.gen_dense_mask(N, 3, mask_freq, psize=psize)
             fM *= mask_3D
-            mrc.writeMRC('particle/1AON_fM_totalmass_{}_oversampling_{}.mrc'.format(str(int(M_totalmass)).zfill(5), zeropad), fM, psz=2.8)
+            mrc.writeMRC('particle/{}_fM_totalmass_{}_oversampling_{}.mrc'.format(
+                os.path.splitext(os.path.basename(model))[0], str(int(M_totalmass)).zfill(5), oversampling_factor
+                ), fM, psz=psize)
 
         slicing_func = RegularGridInterpolator([np.arange(N),]*3, fM, bounds_error=False, fill_value=0.0)
         coords = geometry.gencoords_base(N, 2)
@@ -64,8 +71,8 @@ def gen_slices(model_files, fspace=False, log_scale=True):
             img = np.require(np.random.poisson(img), dtype=np.float32)
 
             if log_scale:
-                img = np.log(np.maximum(img, 0)) * mask
-            else:
+                img = np.log(np.maximum(img, 0))
+            if mask is not None:
                 img *= mask
 
             im = ax.imshow(img, origin='lower')  # cmap='Greys'
@@ -82,7 +89,7 @@ def gen_slices(model_files, fspace=False, log_scale=True):
         # fig.subplots_adjust(right=0.8)
         # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         # fig.colorbar(im, cax=cbar_ax)
-        fig.suptitle('simulated experimental data of XFEL for'.format(model))
+        fig.suptitle('simulated experimental data of XFEL for {}'.format(model))
         # fig.tight_layout()
     plt.show()
 

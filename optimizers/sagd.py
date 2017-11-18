@@ -318,7 +318,6 @@ class SAGDStep(base.BaseStep):
             # self.L = 1.0
 
         currL = self.L
-        print("self.L", self.L)
 
         if init_L:
             self.save_L0(params)

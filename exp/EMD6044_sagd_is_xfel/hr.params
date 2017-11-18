@@ -20,9 +20,12 @@
 'test_imgs':	100,
 
 'max_frequency':        'min(0.15, \
-                             0.02 + 0.005 * (0 if iteration < max(150,50*ceil(num_batches/50.0)) else \
+                             0.015 + 0.005 * (0 if iteration < max(150,50*ceil(num_batches/50.0)) else \
                                               1 if iteration < 2*max(150,50*ceil(num_batches/50.0)) else \
                                               2+floor(max(0,(iteration-2*max(150,50*ceil(num_batches/50.0)))/150.0))))',
+
+'mask_freq': 0.010,
+
 
 'quad_shiftsigma':      10,
 'quad_shiftextent':     60,

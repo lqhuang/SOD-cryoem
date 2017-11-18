@@ -2,7 +2,8 @@ import numpy as np
 
 
 def compute_max_angle(N, rad, usFactor=1.0):
-    r = rad * N / 2.0
+    # r = rad * N / 2.0
+    r = rad * N / 12.0
 
     # This angle is (roughly) the largest angle step that can be taken
     # and not miss any of the high frequency coefficients at this value

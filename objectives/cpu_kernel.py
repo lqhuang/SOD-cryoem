@@ -53,7 +53,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
         if self.using_precomp_slicing:
             # precompute all possible slices
             fM = np.require(fM, dtype=np.float32)
-            getslices_interp(fM, self.slice_ops, self.rad, res=self.slices.reshape(-1, self.N_T))
+            getslices_interp(fM, self.slice_ops, self.rad, self.mask_rad, res=self.slices.reshape(-1, self.N_T))
             self.precomp_slices = self.slices.reshape((-1, self.N_T))
         else:
             # do on-the-fly slicing
@@ -181,7 +181,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
                     if self.using_precomp_slicing:
                         lcl_G[slice_inds] += g
                     else:
-                        lcl_G += merge_slices(g, slice_ops, self.N, self.rad).reshape(self.N, self.N, self.N)
+                        lcl_G += merge_slices(g, slice_ops, self.N, self.rad, self.mask_rad).reshape(self.N, self.N, self.N)
                 res['kern_timing']['proc'][idx] = time.time() - tic
 
                 tic = time.time()
@@ -247,7 +247,7 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
             tic = time.time()
             if self.using_precomp_slicing:
                 # dLdfM = self.slice_ops.T.dot(self.G.reshape((-1,))).reshape((self.N,self.N,self.N))
-                dLdfM = merge_slices(self.G, self.slice_ops, self.N, self.rad).reshape(self.N, self.N, self.N)
+                dLdfM = merge_slices(self.G, self.slice_ops, self.N, self.rad, self.mask_rad).reshape(self.N, self.N, self.N)
                 dLdfM /= N_M
             else:
                 dLdfM = self.G/N_M
@@ -270,8 +270,6 @@ class UnknownRSThreadedCPUKernel(UnknownRSKernel):
 
         L = outputs['like'].sum(dtype=np.float64)/N_M
         outputs['L'] = L
-
-        print("Like", L)
 
         if compute_gradient:
             return L, dLdfM, outputs

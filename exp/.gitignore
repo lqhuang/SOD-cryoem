@@ -11,4 +11,5 @@ like*
 mstep
 *.png
 *.txt
+*.npy
 1AON_sagd_is_*

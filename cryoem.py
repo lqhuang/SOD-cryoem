@@ -5,7 +5,7 @@ from scipy.interpolate import RegularGridInterpolator, interpn
 import scipy.ndimage.interpolation as spinterp
 import scipy.ndimage.filters as spfilter
 
-from geometry import gencoords
+from geometry import gencoords, gencoords_centermask
 
 import pyximport; pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sparsemul
@@ -215,7 +215,7 @@ def getslices(V, SLOP, res=None):
 
     return res
 
-def getslices_interp(V, Rs, rad, res=None):
+def getslices_interp(V, Rs, rad, mask_rad=None, res=None):
     ndim = V.ndim
     assert ndim > 1
     num_slices = len(Rs)
@@ -226,7 +226,10 @@ def getslices_interp(V, Rs, rad, res=None):
     # Rs.shape[2] == 2
     N = V.shape[0]
     center = int(N/2)
-    coords = gencoords(N, 2, rad)
+    if mask_rad is None:
+        coords = gencoords(N, 2, rad)
+    else:
+        coords = gencoords_centermask(N, 2, rad, mask_rad)
     N_T = coords.shape[0]
 
     grid = (np.arange(N),) * ndim
@@ -248,9 +251,12 @@ def getslices_interp(V, Rs, rad, res=None):
     return res
 
 
-def merge_slices(slices, Rs, N, rad, res=None):
+def merge_slices(slices, Rs, N, rad, mask_rad=None, res=None):
     center = int(N/2)
-    coords = gencoords(N, 2, rad)
+    if mask_rad is None:
+        coords = gencoords(N, 2, rad)
+    else:
+        coords = gencoords_centermask(N, 2, rad, mask_rad)
     assert slices.shape[1] == coords.shape[0]
 
     if res is None:
