@@ -855,14 +855,14 @@ class UnknownRSKernel:
         # print("number of slices_sampled < 1.0:", (slices_sampled<1.0).sum(axis=1).mean())
         # print("min of slices_sampled:", slices_sampled.min())
         # print("slices_sampled", rotc_sampled[0] * slices_sampled[0])
-        np.maximum(1e-4, slices_sampled, out=slices_sampled)
+        np.maximum(1e-6, slices_sampled, out=slices_sampled)
 
         # invalid_rotd_sampled = rotd_sampled < 1.0
         # print("number of invalid rotd_sampled", invalid_rotd_sampled.sum(axis=1).mean())
         # rotd_sampled = rotc_sampled * rotd_sampled + 1.0 - rotc_sampled
         # print("number of rotd_sampled < 1.0", rotd_sampled.min())
         # print("rotd_sampled", rotc_sampled[0] * rotd_sampled[0])
-        np.maximum(1e-4, rotd_sampled, out=rotd_sampled)
+        np.maximum(1e-6, rotd_sampled, out=rotd_sampled)
         # rotd_sampled += 1.0
 
         return slice_ops, envelope, \

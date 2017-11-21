@@ -1,6 +1,7 @@
 {
 # 'init_model': "'exp/model-000100.mrc'",
 # 'init_model': "'particle/1AON.mrc'",
+'init_model': "'particle/EMD-6044-cropped.mrc'",
 
 'likelihood': "'UnknownRSLikelihood()'",
 'density_ub': None,

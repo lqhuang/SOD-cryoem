@@ -479,7 +479,7 @@ class CryoOptimizer(BackgroundWorker):
         # cryoem.align_density(M)
         # print("done in {0:.2f}s".format(time.time() - tic))
 
-        M_totalmass = 500000
+        M_totalmass = 1000000
         M *= M_totalmass / M.sum()
         N = M.shape[0]
 
@@ -499,6 +499,9 @@ class CryoOptimizer(BackgroundWorker):
             premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * zp_M)
         M = (V.real ** 2 + V.imag ** 2)[zpm_slices]
         assert M.shape == (N, N, N)
+
+        lowpass_filter = 1.0 - geometry.gen_dense_mask(N, 3, 0.015, psize=self.cparams['pixel_size'])
+        M = lowpass_filter * M + 1.0 - lowpass_filter
 
         mask_freq = self.cparams.get('mask_freq', None)
         mask_3D = geometry.gen_dense_mask(N, 3, mask_freq, psize=self.cparams['pixel_size'])
