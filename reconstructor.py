@@ -479,7 +479,7 @@ class CryoOptimizer(BackgroundWorker):
         # cryoem.align_density(M)
         # print("done in {0:.2f}s".format(time.time() - tic))
 
-        M_totalmass = 1000000
+        M_totalmass = 2000000
         M *= M_totalmass / M.sum()
         N = M.shape[0]
 
