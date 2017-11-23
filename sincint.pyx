@@ -618,14 +618,14 @@ def symmetrize_volume_z(DTYPE_t[:,:,:] V,
 
     return out_ary
 
-def gentrunctofull(N=128, rad=0.3, mask_rad=None):
+def gentrunctofull(N=128, rad=0.3, beamstop_rad=None):
     """ Generates a sparse matrix operator that maps truncated image fourier coefficients (R) back to a full N**2 vector """
     xy = geometry.gencoords(N,2)
     r2 = n.sum(xy**2,axis=1)
-    if mask_rad is None:
+    if beamstop_rad is None:
         active_xy = r2 < (rad*N/2.0)**2
     else:
-        active_xy = n.logical_and(r2 > (mask_rad*N/2.0)**2, r2 < (rad*N/2.0)**2)
+        active_xy = n.logical_and(r2 > (beamstop_rad*N/2.0)**2, r2 < (rad*N/2.0)**2)
     R = sum(active_xy)
     splil = sp.lil_matrix((N**2, R), dtype=n.float32)
 
@@ -639,6 +639,6 @@ def gentrunctofull(N=128, rad=0.3, mask_rad=None):
     spcsr.eliminate_zeros()
     return spcsr
     
-def genfulltotrunc(N=128, rad=0.3, mask_rad=None):
+def genfulltotrunc(N=128, rad=0.3, beamstop_rad=None):
     """ Generates a sparse matrix operator that maps full N**2 vector into truncated image fourier coefficients (R) """
-    return gentrunctofull(N, rad, mask_rad).T
+    return gentrunctofull(N, rad, beamstop_rad).T

@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from numpy import unravel_index, log, maximum
 
 from cryoio import mrc
-from geometry import gen_dense_mask
+from geometry import gen_dense_beamstop_mask
 
 
 def plot_projs(mrcs_files, log_scale=True, plot_randomly=True):
@@ -26,7 +26,7 @@ def plot_projs(mrcs_files, log_scale=True, plot_randomly=True):
         image_stack = mrc.readMRCimgs(mrcs, 0)
         size = image_stack.shape
         N = size[0]
-        mask = gen_dense_mask(N, 2, 0.015, psize=2.8)
+        mask = gen_dense_beamstop_mask(N, 2, 0.015, psize=2.8)
         print('image size: {0}x{1}, number of images: {2}'.format(*size))
         print('Select indices randomly:', plot_randomly)
         fig, axes = plt.subplots(3, 3, figsize=(12.9, 9.6))

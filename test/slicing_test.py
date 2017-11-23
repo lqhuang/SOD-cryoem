@@ -22,9 +22,9 @@ N = 128
 psize = 2.8
 rad_freq = 0.50
 rad = rad_freq * 2.0 * psize
-mask_freq = 0.001
+beamstop_freq = 0.001
 
-mask_2d = geometry.gen_trunc_mask(N, 2, rad_freq, mask_freq, psize=2.8)
+mask_2d = geometry.gen_trunc_mask(N, 2, rad_freq, beamstop_freq, psize=2.8)
 
 TtoF = sincint.gentrunctofull(N=N, rad=rad)
 FtoT = sincint.genfulltotrunc(N=N, rad=rad)
@@ -67,7 +67,7 @@ ZP_fM = V.real ** 2 + V.imag ** 2
 
 fM = ZP_fM[zpm_slices]
 
-# mask_3d_outlier = geometry.gen_dense_mask(N, 3, 0.015, psize=2.8)
+# mask_3d_outlier = geometry.gen_dense_beamstop_mask(N, 3, 0.015, psize=2.8)
 # fM *= mask_3d_outlier
 
 # fM = mrc.readMRC('particle/1AON_fM_totalmass_5000.mrc') * mask_3d_outlier
@@ -125,12 +125,12 @@ plt.show()
 # mask = np.zeros((N, N))
 # # for i in np.arange(0.005, 0.04, 0.005):
 # #     print(i)
-# #     new = geometry.gen_dense_mask(N, 2, i, psize=2.8)
+# #     new = geometry.gen_dense_beamstop_mask(N, 2, i, psize=2.8)
 # #     mask += new
 
 
-# mask_2d = geometry.gen_dense_mask(N, 2, 0.015, psize=2.8)
-# mask_3d = geometry.gen_dense_mask(N, 3, 0.015, psize=2.8)
+# mask_2d = geometry.gen_dense_beamstop_mask(N, 2, 0.015, psize=2.8)
+# mask_3d = geometry.gen_dense_beamstop_mask(N, 3, 0.015, psize=2.8)
 
 # plt.imshow(mask_2d*2 + mask_3d[:, :, int(N/2)])
 # plt.colorbar()

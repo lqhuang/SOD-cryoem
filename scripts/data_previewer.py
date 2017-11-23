@@ -32,8 +32,8 @@ def gen_slices(model_files, fspace=False, log_scale=True):
             zeropad = oversampling_factor - 1  # oversampling factor = zeropad + 1
 
             psize = 3.0 * oversampling_factor
-            mask_freq = 0.01
-            mask = geometry.gen_dense_mask(N, 2, mask_freq, psize=psize)
+            beamstop_freq = 0.01
+            mask = geometry.gen_dense_beamstop_mask(N, 2, beamstop_freq, psize=psize)
             # mask = None
 
             zeropad_size = int(zeropad * (N / 2))
@@ -46,7 +46,7 @@ def gen_slices(model_files, fspace=False, log_scale=True):
             fM = zp_fM[zpm_slicer]
             fM = fM.real ** 2 + fM.imag ** 2
 
-            mask_3D = geometry.gen_dense_mask(N, 3, mask_freq, psize=psize)
+            mask_3D = geometry.gen_dense_beamstop_mask(N, 3, beamstop_freq, psize=psize)
             fM *= mask_3D
             mrc.writeMRC('particle/{}_fM_totalmass_{}_oversampling_{}.mrc'.format(
                 os.path.splitext(os.path.basename(model))[0], str(int(M_totalmass)).zfill(5), oversampling_factor

@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from numpy import unravel_index, log, maximum
 
 from cryoio import mrc
-from geometry import gen_dense_mask
+from geometry import gen_dense_beamstop_mask
 
 
 parser = argparse.ArgumentParser()
@@ -32,6 +32,6 @@ if not isinstance(mrcs_files, list):
 for ph in mrcs_files:
     M = mrc.readMRC(ph)
     N = M.shape[0]
-    mask_3D = gen_dense_mask(N, 3, 0.01, psize = 18)
+    mask_3D = gen_dense_beamstop_mask(N, 3, 0.01, psize = 18)
 
     mrc.writeMRC(ph, M*mask_3D, psz=18)

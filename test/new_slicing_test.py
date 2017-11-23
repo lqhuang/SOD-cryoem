@@ -21,13 +21,13 @@ if __name__ == '__main__':
     psize = 2.8 * 6
     freq = 0.05
     rad = 0.5 * 2.0 * psize
-    mask_freq = 0.01
-    mask_rad = mask_freq * 2.0 * psize
+    beamstop_freq = 0.01
+    beamstop_rad = beamstop_freq * 2.0 * psize
 
     fM = mrc.readMRC('particle/1AON_fourier.mrc')
     N = fM.shape[0]
 
-    TtoF = sincint.gentrunctofull(N=N, rad=rad, mask_rad=mask_rad)
+    TtoF = sincint.gentrunctofull(N=N, rad=rad, beamstop_rad=beamstop_rad)
 
     theta = np.arange(0, 2*np.pi, 2*np.pi/12)
     degree_R, resolution_R = SK97Quadrature.compute_degree(N, 0.3, 1.0)
@@ -51,9 +51,9 @@ if __name__ == '__main__':
     inplane_ops = cryoops.compute_inplanerot_matrix(**inplane_interp)
 
     # generate slices and inplane-rotated slices
-    slices_sampled = cryoem.getslices_interp(fM, slice_ops, rad, mask_rad=mask_rad).reshape((N_R, N_T))
+    slices_sampled = cryoem.getslices_interp(fM, slice_ops, rad, beamstop_rad=beamstop_rad).reshape((N_R, N_T))
     curr_img = TtoF.dot(slices_sampled[0]).reshape(N, N)
-    rotd_sampled = cryoem.getslices_interp(curr_img, inplane_ops, rad, mask_rad=mask_rad).reshape((N_I, N_T))
+    rotd_sampled = cryoem.getslices_interp(curr_img, inplane_ops, rad, beamstop_rad=beamstop_rad).reshape((N_I, N_T))
 
     ## plot figures
     fig, axes = plt.subplots(3, 4, figsize=(9.6, 7.2))

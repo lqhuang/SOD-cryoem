@@ -152,7 +152,7 @@ def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
     return c, truncc, trunkmask
 
 
-def calc_angular_correlation(trunc_slices, N, rad, mask_rad=None, pixel_size=1.0, interpolation='nearest',
+def calc_angular_correlation(trunc_slices, N, rad, beamstop_rad=None, pixel_size=1.0, interpolation='nearest',
                              sort_theta=True, clip=True, outside=False,):
     """compute angular correlation for input array
     outside: True or False (default: False)
@@ -172,10 +172,10 @@ def calc_angular_correlation(trunc_slices, N, rad, mask_rad=None, pixel_size=1.0
     if outside:
         trunc_xy = gencoords_outside(N, 2, rad)
     else:
-        if mask_rad is None:
+        if beamstop_rad is None:
             trunc_xy = geometry.gencoords(N, 2, rad)
         else:
-            trunc_xy = geometry.gencoords_centermask(N, 2, rad, mask_rad)
+            trunc_xy = geometry.gencoords_centermask(N, 2, rad, beamstop_rad)
     if trunc_slices.ndim < 2:
         assert trunc_xy.shape[0] == trunc_slices.shape[0], "wrong length of trunc slice or wrong radius"
     else:

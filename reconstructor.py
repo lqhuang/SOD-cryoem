@@ -500,11 +500,11 @@ class CryoOptimizer(BackgroundWorker):
         M = (V.real ** 2 + V.imag ** 2)[zpm_slices]
         assert M.shape == (N, N, N)
 
-        lowpass_filter = 1.0 - geometry.gen_dense_mask(N, 3, 0.015, psize=self.cparams['pixel_size'])
+        lowpass_filter = 1.0 - geometry.gen_dense_beamstop_mask(N, 3, 0.015, psize=self.cparams['pixel_size'])
         M = lowpass_filter * M + 1.0 - lowpass_filter
 
-        mask_freq = self.cparams.get('mask_freq', None)
-        mask_3D = geometry.gen_dense_mask(N, 3, mask_freq, psize=self.cparams['pixel_size'])
+        beamstop_freq = self.cparams.get('beamstop_freq', None)
+        mask_3D = geometry.gen_dense_beamstop_mask(N, 3, beamstop_freq, psize=self.cparams['pixel_size'])
 
         # apply the symmetry operator
         init_sym = get_symmetryop(self.cparams.get('init_symmetry',self.cparams.get('symmetry',None)))

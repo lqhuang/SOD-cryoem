@@ -67,7 +67,7 @@ class UnknownRSLikelihood(Objective):
         N_D = float(self.cryodata.N_D_Train)
         num_batches = float(self.cryodata.num_batches)
         psize = self.params['pixel_size']
-        mask_freq = self.params.get('mask_freq', None)
+        beamstop_freq = self.params.get('beamstop_freq', None)
 
         mean_corr = self.correlation_history.get_mean().reshape((N,N))
         mean_power = self.power_history.get_mean().reshape((N,N))
@@ -96,10 +96,10 @@ class UnknownRSLikelihood(Objective):
             # Only consider envelope parameters for frequencies above a threshold
             minRad = minFreq*2.0*psize
             
-            if mask_freq is None:
+            if beamstop_freq is None:
                 _, _, minRadMask = gencoords(N, 2, minRad, True)
             else:
-                maskRad = mask_freq * 2.0 * psize
+                maskRad = beamstop_freq * 2.0 * psize
                 _, _, minRadMask = gencoords_centermask(N, 2, minRad, maskRad, True)
             
             exp_env[minRadMask.reshape((N,N))] = 1.0
@@ -595,13 +595,13 @@ class UnknownRSKernel:
         psize = cparams['pixel_size']
         rad_cutoff = cparams.get('rad_cutoff', 1.0)
         rad = min(rad_cutoff,max_freq*2.0*psize)
-        mask_freq = cparams.get('mask_freq', None)
-        mask_rad = mask_freq * 2.0 * psize
+        beamstop_freq = cparams.get('beamstop_freq', None)
+        beamstop_rad = beamstop_freq * 2.0 * psize
 
-        if mask_freq is None:
+        if beamstop_freq is None:
             self.xy, self.trunc_xy, self.truncmask = gencoords(self.N, 2, rad, True)
         else:
-            self.xy, self.trunc_xy, self.truncmask = gencoords_centermask(self.N, 2, rad, mask_rad, True)
+            self.xy, self.trunc_xy, self.truncmask = gencoords_centermask(self.N, 2, rad, beamstop_rad, True)
         self.trunc_freq = np.require(self.trunc_xy / (self.N*psize), dtype=np.float32) 
         self.N_T = self.trunc_xy.shape[0]
 
@@ -613,7 +613,7 @@ class UnknownRSKernel:
         if interp_change:
             print("Iteration {0}: freq = {3}, rad = {1}, N_T = {2}".format(cparams['iteration'], rad, self.N_T, max_freq))
             self.rad = rad
-            self.mask_rad = mask_rad
+            self.beamstop_rad = beamstop_rad
             self.factoredRI = factoredRI
 
         # Setup the quadrature schemes
@@ -803,7 +803,7 @@ class UnknownRSKernel:
                         slices_sampled = self.precomp_slices[samples_R]
                 else:
                     slice_ops = self.quad_domain_RI.compute_operator(self.interp_params,samples_R)
-                    slices_sampled = getslices_interp(fM, slice_ops, self.rad, self.mask_rad).reshape((N_R_sampled,self.N_T))
+                    slices_sampled = getslices_interp(fM, slice_ops, self.rad, self.beamstop_rad).reshape((N_R_sampled,self.N_T))
                     # slices_sampled += 1.0
                 
                 rotd_sampled = Img[self.truncmask.reshape(Img.shape)].reshape((N_I_sampled,self.N_T))
@@ -818,7 +818,7 @@ class UnknownRSKernel:
                         slices_sampled = self.precomp_slices[samples_R]
                 else:
                     slice_ops = self.quad_domain_R.compute_operator(self.slice_interp,samples_R)
-                    slices_sampled = getslices_interp(fM, slice_ops, self.rad, self.mask_rad).reshape((N_R_sampled,self.N_T))
+                    slices_sampled = getslices_interp(fM, slice_ops, self.rad, self.beamstop_rad).reshape((N_R_sampled,self.N_T))
                     # slices_sampled += 1.0
                 if res is not None:
                     res['kern_timing']['prep_slice'][idx] = time.time() - tic 
@@ -834,12 +834,12 @@ class UnknownRSKernel:
                 # Generate the rotated versions of the current image
                 if self.using_precomp_inplane:
                     if samples_I is None:
-                        rotd_sampled = getslices_interp(Img, self.inplane_ops, self.rad, self.mask_rad).reshape((N_I_sampled,self.N_T))
+                        rotd_sampled = getslices_interp(Img, self.inplane_ops, self.rad, self.beamstop_rad).reshape((N_I_sampled,self.N_T))
                     else:
-                        rotd_sampled = getslices_interp(Img, self.inplane_ops, self.rad, self.mask_rad).reshape((self.N_I,self.N_T))[samples_I]
+                        rotd_sampled = getslices_interp(Img, self.inplane_ops, self.rad, self.beamstop_rad).reshape((self.N_I,self.N_T))[samples_I]
                 else:
                     inplane_ops = self.quad_domain_I.compute_operator(self.inplane_interp,samples_I)
-                    rotd_sampled = getslices_interp(Img, inplane_ops, self.rad, self.mask_rad).reshape((N_I_sampled,self.N_T))
+                    rotd_sampled = getslices_interp(Img, inplane_ops, self.rad, self.beamstop_rad).reshape((N_I_sampled,self.N_T))
                     # slices_sampled += 1.0
                 if res is not None:
                     res['kern_timing']['prep_rot_img'][idx] = time.time() - tic 
@@ -933,8 +933,8 @@ class UnknownRSKernel:
             slices_sampled = np.tile(rotc_sampled[argmax_W_I], (N_R, 1)) \
                              * slices_sampled
 
-        ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, self.mask_rad, psize)
-        ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[argmax_W_I]), self.N, self.rad, self.mask_rad, psize)
+        ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, self.beamstop_rad, psize)
+        ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[argmax_W_I]), self.N, self.rad, self.beamstop_rad, psize)
 
         # check zeros
         ac_slices[ac_slices == 0.0] + 1e-16

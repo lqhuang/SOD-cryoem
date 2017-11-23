@@ -215,7 +215,7 @@ def getslices(V, SLOP, res=None):
 
     return res
 
-def getslices_interp(V, Rs, rad, mask_rad=None, res=None):
+def getslices_interp(V, Rs, rad, beamstop_rad=None, res=None):
     ndim = V.ndim
     assert ndim > 1
     num_slices = len(Rs)
@@ -226,10 +226,10 @@ def getslices_interp(V, Rs, rad, mask_rad=None, res=None):
     # Rs.shape[2] == 2
     N = V.shape[0]
     center = int(N/2)
-    if mask_rad is None:
+    if beamstop_rad is None:
         coords = gencoords(N, 2, rad)
     else:
-        coords = gencoords_centermask(N, 2, rad, mask_rad)
+        coords = gencoords_centermask(N, 2, rad, beamstop_rad)
     N_T = coords.shape[0]
 
     grid = (np.arange(N),) * ndim
@@ -251,12 +251,12 @@ def getslices_interp(V, Rs, rad, mask_rad=None, res=None):
     return res
 
 
-def merge_slices(slices, Rs, N, rad, mask_rad=None, res=None):
+def merge_slices(slices, Rs, N, rad, beamstop_rad=None, res=None):
     center = int(N/2)
-    if mask_rad is None:
+    if beamstop_rad is None:
         coords = gencoords(N, 2, rad)
     else:
-        coords = gencoords_centermask(N, 2, rad, mask_rad)
+        coords = gencoords_centermask(N, 2, rad, beamstop_rad)
     assert slices.shape[1] == coords.shape[0]
 
     if res is None:
