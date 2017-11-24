@@ -1,7 +1,0 @@
-{
-'optimizer_name': "'SAGD'",
-
-'optim_algo': "'SAGDStep()'",
-
-'parameterization':   "'real'",
-}

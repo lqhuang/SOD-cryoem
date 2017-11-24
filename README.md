@@ -10,7 +10,7 @@ doi: https://doi.org/10.1101/074732.
 
 Lots of codes are copyright Marcus A. Brubaker and Ali Punjani, 2015 for [cryoem-cvpr2015](https://github.com/mbrubake/cryoem-cvpr2015).
 
-Questions or comments regarding this code should be directed to Lanqing Huang (lqhuang@csrc.ac.cn).
+Questions or comments regarding this code should be directed to Haiguang Liu(hgliu@csrc.ac.cn) or Lanqing Huang (lqhuang@csrc.ac.cn).
 
 
 Getting Started
@@ -18,7 +18,7 @@ Getting Started
 
 To generate data, use the genphantomdata.py script.  Running the command:
 
-$ ./genphantomdata.py 40000 1AON.mrc examplectfs.par Data/1AON
+$ ./genphantomdata.py 40000 1AON.mrc data/1AON
 
 will generate a stack of 40,000 randomly distributed views of the density in 1AON.mrc using the CTF parameters specified in the (supplied) par file.
 

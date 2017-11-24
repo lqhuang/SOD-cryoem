@@ -36,15 +36,8 @@ def gen_slices(model_files, fspace=False, log_scale=True):
             mask = geometry.gen_dense_beamstop_mask(N, 2, beamstop_freq, psize=psize)
             # mask = None
 
-            zeropad_size = int(zeropad * (N / 2))
-            zp_N = zeropad_size * 2 + N
-            zpm_shape = (zp_N,) * 3
-            zp_M = np.zeros(zpm_shape, dtype=density.real_t)
-            zpm_slicer = (slice( zeropad_size, (N + zeropad_size) ),) * 3
-            zp_M[zpm_slicer] = M
-            zp_fM = density.real_to_fspace(zp_M)
-            fM = zp_fM[zpm_slicer]
-            fM = fM.real ** 2 + fM.imag ** 2
+            V = density.real_to_fspace_with_oversampling(M, oversampling_factor)
+            fM = V.real ** 2 + V.imag ** 2
 
             mask_3D = geometry.gen_dense_beamstop_mask(N, 3, beamstop_freq, psize=psize)
             fM *= mask_3D
@@ -76,12 +69,13 @@ def gen_slices(model_files, fspace=False, log_scale=True):
                 img *= mask
 
             im = ax.imshow(img, origin='lower')  # cmap='Greys'
+            ticks = [0, int(N/4.0), int(N/2.0), int(N*3.0/4.0), int(N-1)]
             if row == 2:
-                ax.set_xticks([0, int(N/4.0), int(N/2.0), int(N*3.0/4.0), int(N-1)])
+                ax.set_xticks(ticks)
             else:
                 ax.set_xticks([])
             if col == 0:
-                ax.set_yticks([0, int(N/4.0), int(N/2.0), int(N*3.0/4.0), int(N-1)])
+                ax.set_yticks(ticks)
             else:
                 ax.set_yticks([])
             fig.colorbar(im, ax=ax)

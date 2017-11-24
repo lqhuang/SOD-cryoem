@@ -48,14 +48,14 @@ M = mrc.readMRC('particle/1AON.mrc')
 zeropad = 1
 zeropad_size = int(zeropad * (N / 2))
 zp_N = zeropad_size * 2 + N
-zpm_shape = (zp_N,) * 3
-ZP_M = np.zeros(zpm_shape, dtype=density.real_t)
-zpm_slices = (slice( zeropad_size, (N + zeropad_size) ),) * 3
+zp_M_shape = (zp_N,) * 3
+ZP_M = np.zeros(zp_M_shape, dtype=density.real_t)
+zp_M_slicer = (slice( zeropad_size, (N + zeropad_size) ),) * 3
 
 M_totalmass = 5000
 M *= M_totalmass / M.sum()
 
-ZP_M[zpm_slices] = M
+ZP_M[zp_M_slicer] = M
 
 N = M.shape[0]
 kernel = 'lanczos'
@@ -65,7 +65,7 @@ V = density.real_to_fspace(premult.reshape((1, 1, -1)) * premult.reshape((1, -1,
 # V = density.real_to_fspace(ZP_M)
 ZP_fM = V.real ** 2 + V.imag ** 2
 
-fM = ZP_fM[zpm_slices]
+fM = ZP_fM[zp_M_slicer]
 
 # mask_3d_outlier = geometry.gen_dense_beamstop_mask(N, 3, 0.015, psize=2.8)
 # fM *= mask_3d_outlier
@@ -75,7 +75,7 @@ fM = ZP_fM[zpm_slices]
 imgdata = mrc.readMRCimgs('data/1AON_xfel_5000_totalmass_05000/imgdata.mrc', 420, 1)
 curr_img = imgdata[:, :, 0]
 zp_img = np.zeros((zp_N,)*2, dtype=density.real_t)
-zp_img[zpm_slices[0:2]] = curr_img
+zp_img[zp_M_slicer[0:2]] = curr_img
 # curr_img = zp_img
 
 slice_interp = {'projdirs': dirs, 'N': N, 'kern': 'lanczos', 'kernsize': 4, 'rad': rad, 'sym': None}  # 'zeropad': 0, 'dopremult': True

@@ -47,8 +47,6 @@ def compute_ctf(freqs, rots, akv, cs, wgh, dfmid1f, dfmid2f, angastf, dscale, bf
 
     # return np.require(ctf, dtype=freqs.dtype)
     ctf = np.ones_like(ctf, dtype=np.float32)
-    ctf[freq_radius < 0.010] = 0.0
-    # ctf[freq_radius < 0.001] = 0.0
     return ctf
 
 

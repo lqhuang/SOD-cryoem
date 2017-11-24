@@ -431,10 +431,14 @@ class CryoOptimizer(BackgroundWorker):
                      "    Kernel: " + self.params['kernel'])
         self.ostream("Started on " + socket.gethostname() + \
                      "    At: " + time.strftime('%B %d %Y: %I:%M:%S %p'))
-        print('gitutil:', gitutil.git_get_SHA1().decode('utf-8'))
-        self.ostream("Git SHA1: " + gitutil.git_get_SHA1().decode('utf-8'))
+        try:
+            print('gitutil:', gitutil.git_get_SHA1().decode('utf-8'))
+            self.ostream("Git SHA1: " + gitutil.git_get_SHA1().decode('utf-8'))
+            gitutil.git_info_dump(opj(self.outbase, 'gitinfo'))
+        except Exception:
+            print("Git info is not found.")
+            self.ostream("Fail to dump git information")
         self.ostream(80*"=")
-        gitutil.git_info_dump(opj(self.outbase, 'gitinfo'))
         self.startdatetime = datetime.now()
 
 
@@ -485,21 +489,8 @@ class CryoOptimizer(BackgroundWorker):
 
         # oversampling
         oversampling_factor = self.params['oversampling_factor']
-        zeropad = oversampling_factor - 1
-        zeropad_size = int(zeropad * (N / 2))
-        zp_N = zeropad_size * 2 + N
-        zpm_shape = (zp_N,) * 3
-        zp_M = np.zeros(zpm_shape, dtype=density.real_t)
-        zpm_slices = (slice( zeropad_size, (N + zeropad_size) ),) * 3
-        zp_M[zpm_slices] = M
-        kernel = 'lanczos'
-        ksize = 6
-        premult = cryoops.compute_premultiplier(zp_N, kernel, ksize)
-        V = density.real_to_fspace(
-            premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * zp_M)
-        M = (V.real ** 2 + V.imag ** 2)[zpm_slices]
-        assert M.shape == (N, N, N)
-
+        V = density.real_to_fspace_with_oversampling(M, oversampling_factor)
+        M = V.real ** 2 + V.imag ** 2
         lowpass_filter = 1.0 - geometry.gen_dense_beamstop_mask(N, 3, 0.015, psize=self.cparams['pixel_size'])
         M = lowpass_filter * M + 1.0 - lowpass_filter
 

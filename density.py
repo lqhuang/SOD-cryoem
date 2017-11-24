@@ -127,6 +127,32 @@ def check_hermitian(fM):
 
     return np.linalg.norm(np.absolute(E))
 
+
+def real_to_fspace_with_oversampling(M, oversampling_factor, do_premult=False, kernel='lanczos', ksize=6):
+    N = M.shape[0]
+    zeropad = oversampling_factor - 1
+    zeropad_size = int(zeropad * (N / 2.0))
+    zp_N = zeropad_size * 2 + N
+    zp_M_shape = (zp_N,) * 3
+    zp_M = np.zeros(zp_M_shape, dtype=real_t)
+    zp_M_slicer = (slice( zeropad_size, (N + zeropad_size) ),) * 3
+    zp_M[zp_M_slicer] = M
+
+    if do_premult:
+        from cryoops import compute_premultiplier
+        premult = compute_premultiplier(zp_N, kernel, ksize)
+        V = real_to_fspace(
+                premult.reshape((1, 1, -1))
+                * premult.reshape((1, -1, 1)) 
+                * premult.reshape((-1, 1, 1))
+                * zp_M)
+    else:
+        V = real_to_fspace(zp_M)
+    
+    fM = V[zp_M_slicer]
+    return fM
+
+
 # These functons are used in GPU OTF slicing and unslicing.
 # They either take a volume and put it into 2x2x2 cell format, or take
 # a 2x2x2 cell format and accumulate back into a volume.

@@ -29,7 +29,7 @@ import pyximport; pyximport.install(
 import sincint
 
 
-def genphantomdata(N_D, phantompath, ctfparfile):
+def genphantomdata(N_D, phantompath):
     mscope_params = {'akv': 200, 'wgh': 0.07,
                      'cs': 2.0, 'psize': 3.0, 'bfactor': 500.0}
 
@@ -50,6 +50,7 @@ def genphantomdata(N_D, phantompath, ctfparfile):
     bfactor = mscope_params['bfactor']
     M_totalmass = float(M_totalmass)
 
+    ctfparfile = 'particle/examplectfs.par'
     srcctf_stack = CTFStack(ctfparfile, mscope_params)
     genctf_stack = GeneratedCTFStack(mscope_params, parfields=[
                                      'PHI', 'THETA', 'PSI', 'SHX', 'SHY'])
@@ -64,22 +65,10 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         M *= M_totalmass / M.sum()
 
     # oversampling
-    oversampling_factor = 6
+    oversampling_factor = 3
     psize = psize * oversampling_factor
-
-    zeropad = oversampling_factor - 1
-    zeropad_size = int(zeropad * (N / 2))
-    zp_N = zeropad_size * 2 + N
-    zpm_shape = (zp_N,) * 3
-    zp_M = np.zeros(zpm_shape, dtype=density.real_t)
-    zpm_slices = (slice( zeropad_size, (N + zeropad_size) ),) * 3
-    zp_M[zpm_slices] = M
-
-    premult = cryoops.compute_premultiplier(zp_N, kernel, ksize)
-    V = density.real_to_fspace(
-        premult.reshape((1, 1, -1)) * premult.reshape((1, -1, 1)) * premult.reshape((-1, 1, 1)) * zp_M)
-    zp_fM = V.real ** 2 + V.imag ** 2
-    fM = zp_fM[zpm_slices]
+    V = density.real_to_fspace_with_oversampling(M, oversampling_factor)
+    fM = V.real ** 2 + V.imag ** 2
 
     # mrc.writeMRC('particle/EMD6044_fM_totalmass_{}_oversampling_{}.mrc'.format(str(int(M_totalmass)).zfill(5), zeropad), fM, psz=2.8)
 
@@ -114,22 +103,19 @@ def genphantomdata(N_D, phantompath, ctfparfile):
         EA = geometry.genEA(pt)[0]
         EA[2] = psi
 
+        # Rotate coordinates and get slice image by interpolation
         R = geometry.rotmat3D_EA(*EA)[:, 0:2]
-        # slop = cryoops.compute_projection_matrix(
-        #     [R], N, kernel, ksize, rad, 'rots')
-        # D = slop.dot(fM.reshape((-1,)))
-
         rotated_coords = R.dot(coords.T).T + int(N/2)
-        D = slicing_func(rotated_coords)
-
-        intensity = TtoF.dot(D)
+        slice_data = slicing_func(rotated_coords)
+        intensity = TtoF.dot(slice_data)
         np.maximum(intensity, 0.0, out=intensity)
 
+        # Add poisson noise
         img = np.float_(np.random.poisson(intensity.reshape(N, N)), dtype=density.real_t)
         img = intensity.reshape(N, N)
         np.maximum(1e-8, img, out=img)
+        imgdata[i] = np.require(img, dtype=density.real_t)
 
-        imgdata[i] = np.require(img * C + 1.0 - C, dtype=density.real_t)
         genctf_stack.add_img(genctfI,
                              PHI=EA[0] * 180.0 / np.pi, THETA=EA[1] * 180.0 / np.pi, PSI=EA[2] * 180.0 / np.pi,
                              SHX=0.0, SHY=0.0)
@@ -141,15 +127,15 @@ def genphantomdata(N_D, phantompath, ctfparfile):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 4:
         print("""Wrong Number of Arguments. Usage:
 %run genphantomdata num inputmrc inputpar output
-%run genphantomdata 5000 finalphantom.mrc Data/thermus/thermus_Nature2012_128x128.par Data/phantom_5000
+%run genphantomdata 5000 finalphantom.mrc data/phantom_5000
 """)
         sys.exit()
 
-    imgdata, ctfstack, pardata, mscope_params = genphantomdata(sys.argv[1], sys.argv[2], sys.argv[3])
-    outpath = sys.argv[4]
+    imgdata, ctfstack, pardata, mscope_params = genphantomdata(sys.argv[1], sys.argv[2])
+    outpath = sys.argv[3]
     if not os.path.isdir(outpath):
         os.makedirs(outpath)
 

@@ -1,9 +1,0 @@
-# Common parameters for 1AON optimization experiments
-{
-'dataset_name': "'EMD_6044_no_shifts'",
-'inpath': 'data/EMD_6044/no_shifts_5000/imgdata.mrc',
-'ctfpath': 'data/EMD_6044/no_shifts_5000/defocus.txt',
-'microscope_params': {'akv':200,'wgh':0.07,'cs':2.0},
-'resolution': 3.0,
-'learn_like_envelope_bfactor': 500.0,
-}
