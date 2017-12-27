@@ -4,13 +4,7 @@ from __future__ import print_function, division
 import os
 import sys
 sys.path.append(os.path.dirname(sys.path[0]))
-try:
-    import cPickle as pickle  # python 2
-except ImportError:
-    import pickle  # python 3
-import socket
 import argparse
-from random import randint
 
 from matplotlib import pyplot as plt
 from numpy import unravel_index, log, maximum
@@ -34,4 +28,6 @@ for ph in mrcs_files:
     N = M.shape[0]
     mask_3D = gen_dense_beamstop_mask(N, 3, 0.01, psize = 18)
 
-    mrc.writeMRC(ph, M*mask_3D, psz=18)
+    filename, ext = os.path.splitext(ph)
+    new_path = filename + '-bsmasked' + ext
+    mrc.writeMRC(new_path, M*mask_3D, psz=18)
