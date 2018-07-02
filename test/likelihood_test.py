@@ -10,6 +10,7 @@ from matplotlib import colors
 from matplotlib import gridspec
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import numpy as np
+from scipy.stats import entropy
 
 from cryoio import mrc
 from cryoio import ctf
@@ -273,22 +274,39 @@ class SimpleKernel():
 
         self.cached_workspace = dict()
 
-    def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope):
+    def get_angular_correlation(self, slices_sampled, rotd_sampled, rotc_sampled, envelope, log_W_I):
         N_R, N_T = slices_sampled.shape
         assert rotd_sampled[0].shape == rotc_sampled[0].shape
         assert rotd_sampled[0].shape[0] == N_T
 
+        max_W_I = log_W_I.argmax()
         if envelope is not None:
             assert envelope.shape[0] == slices_sampled.shape[1], "wrong length for envelope"
-            slices_sampled = np.tile(envelope, (N_R, 1)) * np.tile(rotc_sampled[0], (N_R, 1)) \
+            slices_sampled = np.tile(envelope, (N_R, 1)) * np.tile(rotc_sampled[max_W_I], (N_R, 1)) \
                              * slices_sampled
         else:
+<<<<<<< HEAD
             slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
 
         ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, self.psize)
         ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[0]), self.N, self.rad, self.psize)
 
         return ac_slices, ac_data
+=======
+            slices_sampled = np.tile(rotc_sampled[max_W_I], (N_R, 1)) * slices_sampled
+
+        ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, self.psize)
+        ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[max_W_I]), self.N, self.rad, self.psize)
+
+        # check zeros
+        ac_slices[ac_slices == 0.0] + 1e-16
+        # calculating K-L divergence
+        ac_e_R = entropy(np.tile(ac_data, (N_R, 1)).T, ac_slices.T)  # qk is used to approximate pk, qk
+        ac_indices = ac_e_R.argsort()
+        cutoff = 30
+
+        return ac_indices[0:cutoff]
+>>>>>>> 20351a54e495bf2df931b9dfc87cd6cd2807a927
 
     def set_data(self, model, cparams):
 
@@ -446,15 +464,9 @@ class SimpleKernel():
         if self.use_angular_correlation:
             ac_data_sampled = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad, self.psize)
 
-        if self.use_angular_correlation:
-            return slice_ops, envelope, \
-                W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
-                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
-                ac_slices_sampled, ac_data_sampled
-        else:
-            return slice_ops, envelope, \
-                W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
-                W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled
+        return slice_ops, envelope, \
+            W_R_sampled, sampleinfo_R, slices_sampled, samples_R, \
+            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled
 
     def worker(self, idx):
         g_size = (self.N_R, self.N_T)
@@ -462,22 +474,18 @@ class SimpleKernel():
         workspace = None
         sigma2 = self.inlier_sigma2_trunc
 
-        if self.use_angular_correlation:
-            slice_ops, envelope, \
-            W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
-            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled, \
-            ac_slices_sampled, ac_data_sampled = self.prep_operators(idx)
-        else:
-            slice_ops, envelope, \
-            W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
-            W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
-                self.prep_operators(idx)
+        slice_ops, envelope, \
+        W_R_sampled, sampleinfo_R, slices_sampled, slice_inds, \
+        W_I_sampled, sampleinfo_I, rotd_sampled, rotc_sampled = \
+            self.prep_operators(idx)
 
         print('max intensity for slices_sampled:', slices_sampled.max())
         print('max intensity for rotd_sampled:', rotd_sampled.max())
         if self.use_angular_correlation:
-            print('max intensity for ac_slices_sampled:', ac_slices_sampled.max())
-            print('max intensity for ac_data_sampled:', ac_data_sampled.max())
+            # print('max intensity for ac_slices_sampled:', ac_slices_sampled.max())
+            # print('max intensity for ac_data_sampled:', ac_data_sampled.max())
+            ac_indices = self.get_angular_correlation(
+                slices_sampled, rotd_sampled, rotc_sampled, envelope, W_I_sampled)
 
         log_W_I = np.log(W_I_sampled)
         log_W_R = np.log(W_R_sampled)
@@ -486,7 +494,8 @@ class SimpleKernel():
             like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, workspace = \
                 py_objective_kernels.doimage_ACRI(slices_sampled, envelope, \
                     rotc_sampled, rotd_sampled, \
-                    ac_slices_sampled, ac_data_sampled, \
+                    # ac_slices_sampled, ac_data_sampled, \
+                    ac_indices,
                     log_W_I, log_W_R, \
                     sigma2, g, workspace)
         else:
@@ -509,6 +518,7 @@ class SimpleKernel():
                 log_W_I, log_W_R, \
                 sigma2, g, None)
 
+        print("full like:", like)
         workspace['full_like_cphi_I'] = cphi_I
         workspace['full_like_cphi_R'] = cphi_R
 
@@ -539,7 +549,7 @@ class SimpleKernel():
         num_idxs = len(processed_idxs)
         top1_rmsd = np.zeros(num_idxs)
         topN_rmsd = np.zeros(num_idxs)
-        cutoff_R = 10
+        cutoff_R = 30
         topN_weight = np.exp(-np.arange(cutoff_R) / 2)
         topN_weight /= topN_weight.sum()
 
@@ -586,7 +596,7 @@ class SimpleKernel():
         sorted_indices_R = (-phi_R).argsort()
         sorted_indices_I = (-phi_I).argsort()
 
-        cutoff_idx_R = 10
+        cutoff_idx_R = 30
         # cutoff_idx_R = np.diff((-phi_R)[sorted_indices_R]).argmax() + 1
         cutoff_idx_I = np.diff((-phi_I)[sorted_indices_I]).argmax() + 1
         potential_R = quad_domain_R.dirs[sorted_indices_R[0:cutoff_idx_R]]
@@ -645,7 +655,7 @@ def likelihood_estimate(model, refined_model, use_angular_correlation=False, add
                 break
     euler_angles = np.asarray(euler_angles)
 
-    data_params = {'num_images': 200, 'pixel_size': 2.8,
+    data_params = {'num_images': 20, 'pixel_size': 2.8,
                    'sigma_noise': 5.0,
                    'euler_angles': euler_angles,
                    'symmetry': 'C7',
