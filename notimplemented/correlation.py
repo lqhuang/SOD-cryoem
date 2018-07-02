@@ -53,11 +53,11 @@ def pol2cart(*coords):
 
 
 # Image center:
-# The center of rotation of a 2D image of dimensions xdim x ydim is defined by 
+# The center of rotation of a 2D image of dimensions xdim x ydim is defined by
 # ((int)xdim/2, (int)(ydim/2)) (with the first pixel in the upper left being (0,0).
 # Note that for both xdim=ydim=65 and for xdim=ydim=64, the center will be at (32,32).
-# This is the same convention as used in SPIDER and XMIPP. Origin offsets reported 
-# for individual images translate the image to its center and are to be applied 
+# This is the same convention as used in SPIDER and XMIPP. Origin offsets reported
+# for individual images translate the image to its center and are to be applied
 # BEFORE rotations.
 def imgpolarcoord(img, rad=1.0):
     """
@@ -127,13 +127,13 @@ def get_corr_imgs(imgs, rad=1.0, pcimg_interpolation='nearest'):
 
 
 def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
-    """ generate coordinates of all points in an NxN..xN grid with d dimensions 
-    coords in each dimension are [-N/2, N/2) 
+    """ generate coordinates of all points in an NxN..xN grid with d dimensions
+    coords in each dimension are [-N/2, N/2)
     N should be even"""
     if not truncmask:
         _, truncc, _ = gencoords_outside(N, d, rad, True)
         return truncc
-    
+
     c = geometry.gencoords_base(N, d)
 
     if rad is not None:
@@ -143,12 +143,12 @@ def gencoords_outside(N, d, rad=None, truncmask=False, trunctype='circ'):
         elif trunctype == 'square':
             r = np.max(np.abs(c), axis=1)
             trunkmask = r > (rad*N/2.0)
-            
+
         truncc = c[trunkmask, :]
     else:
         trunkmask = np.ones((c.shape[0],), dtype=np.bool8)
         truncc = c
- 
+
     return c, truncc, trunkmask
 
 
@@ -208,11 +208,15 @@ def calc_angular_correlation(trunc_slices, N, rad, pixel_size=1.0, interpolation
         indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
         # minimum points to do fft (2 or 4 times than Nyquist frequency)
         minimum_sample_points = (4 / count) / resolution
-        if count <  minimum_sample_points:
-            angular_correlation[indices]  = np.copy(sorted_slice[indices])
+        same_rho = np.copy(sorted_slice[indices])
+        if count < minimum_sample_points:
+            for shift in range(count):
+                curr_delta_phi = same_rho * np.roll(same_rho, shift, axis=axis)
+                indices[axis] = unique_idx[i] + shift
+                angular_correlation[indices] = np.mean(curr_delta_phi, axis=axis)
         else:
+            # print('fft method')
             # use view (slicing) or copy (fancy indexing, np.take(), np.put())?
-            same_rho = np.copy(sorted_slice[indices])
             fpcimg_real = density.real_to_fspace(same_rho.real, axes=(axis,))  # polar image in fourier sapce
             angular_correlation[indices].real = density.fspace_to_real(
                 fpcimg_real * fpcimg_real.conjugate(), axes=(axis,)).real
@@ -237,26 +241,23 @@ def calc_angular_correlation(trunc_slices, N, rad, pixel_size=1.0, interpolation
     if clip:
         factor = 3.0
         for i, count in enumerate(unique_counts):
-            minimum_sample_points = (4 / count) / resolution
-            if count <  minimum_sample_points:
-                pass
-            else:
-                indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
-                mean = np.tile(angular_correlation[indices].mean(axis), (count, 1)).T
-                std = np.tile(angular_correlation[indices].std(axis), (count, 1)).T
+            indices[axis] = slice(unique_idx[i], unique_idx[i] + count)
+            mean = np.tile(angular_correlation[indices].mean(axis), (count, 1)).T
+            std = np.tile(angular_correlation[indices].std(axis), (count, 1)).T
 
-                if np.all(std < 1e-16):
-                    warnings.warn("Standard deviation all equal to zero")
-                    vmin = mean.mean(axis) - factor * std.mean(axis)
-                    vmax = mean.mean(axis) + factor * std.mean(axis)
-                else:
-                    angular_correlation[indices] = (angular_correlation[indices] - mean) / std
-                    vmin = -factor
-                    vmax = +factor
+            # if np.all(std < 1e-16):
+            #     print(std)
+            #     print(i)
+            #     warnings.warn("Standard deviation all equal to zero")
+            vmin = mean.mean(axis) - factor * std.mean(axis)
+            vmax = mean.mean(axis) + factor * std.mean(axis)
+            # else:
+            #     angular_correlation[indices] = (angular_correlation[indices] - mean) / std
+            #     vmin = -factor
+            #     vmax = +factor
 
-                angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
-                # angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
-
+            angular_correlation[indices] = np.clip(angular_correlation[indices].T, vmin, vmax).T  # set outlier to nearby boundary
+            # angular_correlation[indices] = threshold(angular_correlation[indices].T, vmin, vmax, 0).T  # set outlier to 0
 
     # 5.
     corr_trunc_slices = np.take(angular_correlation, sorted_idx.argsort(), axis=axis)
@@ -277,7 +278,7 @@ def calc_full_ac(image, rad, outside=True, **ac_kwargs):
     trunc = FtoT.dot(image.flatten())
     corr_trunc = calc_angular_correlation(trunc, N, rad, **ac_kwargs)
     full_angular_correlation = TtoF.dot(corr_trunc)
-    
+
     if outside:
         _, _, outside_mask = gencoords_outside(N, 2, rad, True)
         corr_trunc_outside = calc_angular_correlation(image[outside_mask.reshape(N, N)].flatten(),

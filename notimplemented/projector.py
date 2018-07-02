@@ -52,7 +52,7 @@ def trunc_to_full(trunc_samples, N, rad):
     return full_samples
 
 
-def project(model, euler_angles, rad=0.95, truncate=False):
+def project(model, euler_angles, rad=0.95, truncate=False, oversampling_factor=1):
     if isinstance(model, str):
         M = mrc.readMRC(model)
     elif isinstance(model, np.ndarray):
@@ -68,7 +68,8 @@ def project(model, euler_angles, rad=0.95, truncate=False):
                 * premult.reshape((1, -1, 1)) \
                 * premult.reshape((-1, 1, 1))
     # premulter = 1
-    fM = density.real_to_fspace(premulter * M)
+    # fM = density.real_to_fspace(premulter * M)
+    fM = density.real_to_fspace_with_oversampling(premulter * M, oversampling_factor)
 
     euler_angles = euler_angles.reshape((-1, 3))
     num_projs = euler_angles.shape[0]

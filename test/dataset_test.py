@@ -26,7 +26,7 @@ import pyximport; pyximport.install(
     build_dir=cython_build_dirs, setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import sincint
 
-from noise_test import plot_noise_histogram, plot_stack_noise
+from .noise_test import plot_noise_histogram, plot_stack_noise
 
 
 class SimpleDataset():
@@ -97,7 +97,6 @@ class SimpleDataset():
             D = slop.dot(fM.reshape((-1,)))
             imgdata[i] = density.fspace_to_real((ctf_map * TtoF.dot(D)).reshape((N, N))) + np.require(
                 np.random.randn(N, N) * sigma_noise, dtype=density.real_t)
-            from multiprocessing import pool, cpu_count
         self.imgdata = imgdata
         print("  cost {} seconds.".format(time.time()-tic))
 
@@ -169,8 +168,8 @@ class SimpleDataset():
 
     def normalize_dataset(self):
         self.real_noise_var = self.noise_var
-        self.scale_images(1.0 / np.sqrt(self.noise_var))
-        self.scale_ctfs(1.0 / np.sqrt(self.noise_var))
+        # self.scale_images(1.0 / np.sqrt(self.noise_var))
+        # self.scale_ctfs(1.0 / np.sqrt(self.noise_var))
 
         self.data_var = self.data_var / self.noise_var
         self.signal_var = self.signal_var / self.noise_var

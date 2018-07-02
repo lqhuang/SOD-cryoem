@@ -54,7 +54,7 @@ def plotwinkeltriple(dirs, values, spot=None, others=None, vmin=None, vmax=None,
     phi = np.arctan2(dirs[:,2],np.linalg.norm(dirs[:,0:2],axis=1)).reshape((-1,))
     theta = np.arctan2(dirs[:,1],dirs[:,0]).reshape((-1,))
     x,y = winkeltriple(theta,phi)
-    
+
     t_border = np.concatenate( [ np.linspace(np.pi,-np.pi,50), np.ones(50)*-np.pi, np.linspace(-np.pi,np.pi,50), np.ones(50)*np.pi ] )
     ph_border = np.concatenate( [ np.ones(50)*-np.pi/2.0, np.linspace(-np.pi/2,np.pi/2.0,50), np.ones(50)*np.pi/2.0, np.linspace(np.pi/2.0,-np.pi/2.0,50) ] )
     x_border,y_border = winkeltriple(t_border,ph_border)
@@ -63,15 +63,17 @@ def plotwinkeltriple(dirs, values, spot=None, others=None, vmin=None, vmax=None,
         norm = colors.LogNorm()
     else:
         norm = colors.Normalize()
-    
+
     if axes is not None:
         ax = axes
     else:
         ax = plt.subplot(111)
-    tripim = ax.tripcolor(x, y, 1e-10 + values, shading='gouraud',vmin=vmin+1e-10,vmax=vmax+1e-10,norm=norm)
-    plt.colorbar(tripim)
+    tripim = ax.tripcolor(x, y, 1e-10 + values, shading='gouraud',vmin=vmin+1e-10,vmax=vmax+1e-10,norm=norm, cmap='jet')
+    ax_divider = make_axes_locatable(ax)
+    cax = ax_divider.append_axes("right", size="10%", pad="2%")
+    ax.get_figure().colorbar(tripim, cax=cax, ax=ax)
     ax.plot(x_border,y_border,'-k')
-
+    ax.axis('off')
     if spot is not None:
         phi_s = np.arctan2(spot[:,2],np.linalg.norm(spot[:,0:2],axis=1)).reshape((-1,))
         theta_s = np.arctan2(spot[:,1],spot[:,0]).reshape((-1,))
@@ -88,6 +90,7 @@ def plotwinkeltriple(dirs, values, spot=None, others=None, vmin=None, vmax=None,
 
     if axes is None:
         plt.show()
+    return ax
 # ------------------------------------------------------------------- #
 
 
@@ -240,7 +243,7 @@ def kernel_test(data_dir, model_file, use_angular_correlation=False):
         workspace['cphi_I'] = cphi_I
         if kernel.sampler_S is not None:
             workspace['cphi_S'] = cphi_S
-    
+
         SimpleKernel.plot_distribution(workspace, kernel.quad_domain_R, kernel.quad_domain_I, correct_ea=ea)
 
         isw = 1
@@ -281,10 +284,10 @@ class SimpleKernel():
                              * slices_sampled
         else:
             slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
-        
+
         ac_slices = correlation.calc_angular_correlation(np.abs(slices_sampled), self.N, self.rad, self.psize)
         ac_data = correlation.calc_angular_correlation(np.abs(rotd_sampled[0]), self.N, self.rad, self.psize)
-        
+
         return ac_slices, ac_data
 
     def set_data(self, model, cparams):
@@ -302,7 +305,7 @@ class SimpleKernel():
         rad = min(rad_cutoff, max_freq * 2.0 * self.psize)
 
         self.xy, self.trunc_xy, self.truncmask = geometry.gencoords(self.N, 2, rad, True)
-        self.trunc_freq = np.require(self.trunc_xy / (self.N * self.psize), dtype=np.float32) 
+        self.trunc_freq = np.require(self.trunc_xy / (self.N * self.psize), dtype=np.float32)
         self.N_T = self.trunc_xy.shape[0]
 
         # set CTF and envelope
@@ -311,14 +314,14 @@ class SimpleKernel():
             self.envelope = ctf.envelope_function(radius_freqs, cparams.get('learn_like_envelope_bfactor', None))
         else:
             self.envelope = np.ones(self.N_T, dtype=np.float32)
-        
+
         print("Iteration {0}: freq = {3}, rad = {1:.4f}, N_T = {2}".format(cparams['iteration'], rad, self.N_T, max_freq))
         self.set_quad(rad)
 
         # Setup inlier model
         self.inlier_sigma2 = 1.0  # cparams['sigma']**2
         base_sigma2 = 1.0  # self.cryodata.noise_var
-        self.inlier_sigma2_trunc = self.inlier_sigma2 
+        self.inlier_sigma2_trunc = self.inlier_sigma2
         # self.inlier_const = (self.N_T/2.0)*np.log(2.0*np.pi*self.inlier_sigma2)
 
         # # Compute the likelihood for the image content outside of rad
@@ -413,7 +416,8 @@ class SimpleKernel():
         slice_ops = self.slice_ops
         if self.use_cached_slicing and self.slices_sampled is not None:
             slices_sampled = self.slices_sampled
-            ac_slices_sampled = self.ac_slices_sampled
+            if self.use_angular_correlation:
+                ac_slices_sampled = self.ac_slices_sampled
         else:
             fM = self.get_fft(self.model, self.slice_interp)
             slices_sampled = cryoem.getslices(fM, self.slice_ops).reshape((N_R, N_T))
@@ -426,9 +430,10 @@ class SimpleKernel():
                                 * slices_sampled
             else:
                 slices_sampled = np.tile(rotc_sampled[0], (N_R, 1)) * slices_sampled
-            ac_slices_sampled = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, self.psize)
-            self.ac_slices_sampled = ac_slices_sampled
-            
+            if self.use_angular_correlation:
+                ac_slices_sampled = correlation.calc_angular_correlation(slices_sampled, self.N, self.rad, self.psize)
+                self.ac_slices_sampled = ac_slices_sampled
+
         # inplane samples
         W_I = self.inplane_quad['W']
         W_I_sampled = np.require(W_I, dtype=density.real_t)
@@ -438,7 +443,8 @@ class SimpleKernel():
         print('max intensity for fft proj:', curr_fft_image.max())
         rotd_sampled = cryoem.getslices(curr_fft_image, self.inplane_ops).reshape((N_I, N_T))
         # compute angular correlation
-        ac_data_sampled = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad, self.psize)
+        if self.use_angular_correlation:
+            ac_data_sampled = correlation.calc_angular_correlation(rotd_sampled[0], self.N, self.rad, self.psize)
 
         if self.use_angular_correlation:
             return slice_ops, envelope, \
@@ -454,7 +460,7 @@ class SimpleKernel():
         g_size = (self.N_R, self.N_T)
         g = np.zeros(g_size, dtype=self.G_datatype)
         workspace = None
-        sigma2 = self.inlier_sigma2_trunc 
+        sigma2 = self.inlier_sigma2_trunc
 
         if self.use_angular_correlation:
             slice_ops, envelope, \
@@ -494,7 +500,7 @@ class SimpleKernel():
         workspace['like'] = like
         workspace['cphi_I'] = cphi_I
         workspace['cphi_R'] = cphi_R
-        
+
         g = np.zeros(g_size, dtype=self.G_datatype)
 
         like, (cphi_I, cphi_R), csigma2_est, ccorrelation, cpower, _ = \
@@ -612,7 +618,7 @@ class SimpleKernel():
             (-phi_I).max(), (-phi_I).min())
         )
         ax_inplane.grid(True)
-        
+
         plt.show()
 
 # ---------------------------------- main --------------------------- #
@@ -709,7 +715,7 @@ def noise_estimate(model, refined_model, add_ctf=True):
     else:
         ctf_map = np.ones_like(proj)
     exp_proj = density.fspace_to_real(density.real_to_fspace(proj) * ctf_map) + noise
-    
+
     # estimate noise profile
     noise_var = np.std(noise) ** 2
     data_var = np.mean(exp_proj**2)
@@ -771,8 +777,9 @@ if __name__ == '__main__':
     # data_dir = 'data/1AON_no_shifts_20000'
     # kernel = kernel_test(data_dir, model_file, use_angular_correlation=True)
 
+    # model = mrc.readMRC(model_file)
+    # refined_model = mrc.readMRC(refined_model_file)
+    # likelihood_estimate(model, refined_model, use_angular_correlation=True)
     model = mrc.readMRC(model_file)
     refined_model = mrc.readMRC(refined_model_file)
-    likelihood_estimate(model, refined_model, use_angular_correlation=True)
-
-    # noise_estimate(model, refined_model)
+    noise_estimate(model, refined_model)
